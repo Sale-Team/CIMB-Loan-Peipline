@@ -3,11 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "ajv": "^6.12.6",
-    "firebase": "^10.0.0",
-    "lucide-react": "^0.376.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "ajv": "6.12.6",
+    "firebase": "10.0.0",
+    "lucide-react": "0.376.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
     "react-scripts": "5.0.1"
   },
   "scripts": {
@@ -23,19 +23,3 @@
     "development": ["last 1 chrome version"]
   }
 }
-```
-
-Commit ✅
-
----
-
-## Then go to Vercel → Settings → General:
-
-**Install Command:**
-```
-npm install --legacy-peer-deps
-```
-
-**Build Command:**
-```
-CI=false react-scripts build
