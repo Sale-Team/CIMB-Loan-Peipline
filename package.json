@@ -3,18 +3,39 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
+    "ajv": "^6.12.6",
     "firebase": "^10.0.0",
     "lucide-react": "^0.376.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-react": "^4.0.0",
-    "vite": "^4.0.0"
+    "react-dom": "^18.2.0",
+    "react-scripts": "5.0.1"
   },
   "scripts": {
-    "start": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test"
+  },
+  "eslintConfig": {
+    "extends": ["react-app"]
+  },
+  "browserslist": {
+    "production": [">0.2%", "not dead", "not op_mini all"],
+    "development": ["last 1 chrome version"]
   }
 }
+```
+
+Commit ✅
+
+---
+
+## Then go to Vercel → Settings → General:
+
+**Install Command:**
+```
+npm install --legacy-peer-deps
+```
+
+**Build Command:**
+```
+CI=false react-scripts build
