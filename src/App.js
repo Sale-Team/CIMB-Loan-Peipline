@@ -790,7 +790,13 @@ export default function App() {
                         <span className="w-1 h-5 bg-gradient-to-b from-indigo-500 to-blue-500 rounded-full mr-3 inline-block"></span>
                         🏆 Top Performance
                       </h3>
-                      <button onClick={() => handleExportCustomers(visibleDeals)}
+                      <button onClick={() => {
+                        let d = visibleDeals;
+                        if (topPerfLoanType !== "all") d = d.filter(x => x.loanType === topPerfLoanType);
+                        if (topPerfStartDate) d = d.filter(x => x.date >= topPerfStartDate);
+                        if (topPerfEndDate) d = d.filter(x => x.date <= topPerfEndDate);
+                        handleExportCustomers(d);
+                      }}
                         className="flex items-center space-x-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white px-4 py-2 rounded-xl text-sm font-medium shadow-sm transition-all hover:shadow-md">
                         <FileDown size={16} /><span>📊 Export Excel</span>
                       </button>
