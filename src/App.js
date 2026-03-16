@@ -929,12 +929,7 @@ export default function App() {
                         className="flex items-center space-x-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white px-4 py-2 rounded-xl text-sm font-medium shadow-sm transition-all hover:shadow-md">
                         <FileDown size={16} /><span>📊 Export Excel</span>
                       </button>
-                      {isAdmin && (
-                        <button onClick={handleExportUsers}
-                          className="flex items-center space-x-2 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white px-4 py-2 rounded-xl text-sm font-medium shadow-sm transition-all hover:shadow-md">
-                          <FileDown size={16} /><span>👥 Export Users</span>
-                        </button>
-                      )}
+
                     </div>
                   </div>
                   {/* 5 Filters row */}
@@ -1153,10 +1148,16 @@ export default function App() {
                       <h2 className="text-lg font-bold text-slate-800">User Created</h2>
                       <p className="text-sm text-slate-500 mt-0.5">{appUsers.length} total accounts</p>
                     </div>
-                    <button onClick={() => { setEditingUser(null); setNewUser({ username: "", password: "", name: "", role: "rm", branch: "NRD", branches: [] }); setIsUserModalOpen(true); }}
-                      className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium">
-                      <UserPlus size={18} /><span>Add New User</span>
-                    </button>
+                    <div className="flex gap-2">
+                      <button onClick={handleExportUsers}
+                        className="flex items-center space-x-2 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white px-4 py-2.5 rounded-xl text-sm font-medium">
+                        <FileDown size={18} /><span>👥 Export Users</span>
+                      </button>
+                      <button onClick={() => { setEditingUser(null); setNewUser({ username: "", password: "", name: "", role: "rm", branch: "NRD", branches: [] }); setIsUserModalOpen(true); }}
+                        className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium">
+                        <UserPlus size={18} /><span>Add New User</span>
+                      </button>
+                    </div>
                   </div>
                   {/* Stats row */}
                   <div className="grid grid-cols-4 divide-x divide-slate-100 border-b border-slate-100">
