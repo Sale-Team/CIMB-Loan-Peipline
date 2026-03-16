@@ -306,6 +306,7 @@ export default function App() {
   });
 
   const isAdmin = loggedInUser?.role === "admin";
+  const isBM = loggedInUser?.role === "bm";
   const rmList = appUsers.filter(u => u.role === "rm");
 
   const showToast = (msg) => { setSuccessToast(msg); setTimeout(() => setSuccessToast(null), 3500); };
@@ -319,7 +320,7 @@ export default function App() {
 
   // Export users to Excel/CSV
   const handleExportUsers = () => {
-    const data = appUsers.map((u, i) => ({ ...u, no: i + 1, role: u.role === "admin" ? "Administrator" : "Relationship Manager" }));
+    const data = appUsers.map((u, i) => ({ ...u, no: i + 1, role: u.role === "admin" ? "Administrator" : u.role === "bm" ? "Branch Manager" : "Relationship Manager" }));
     exportToExcel(data, "Chip_Mong_Users", USER_HEADERS);
     showToast("✅ Users exported to Excel!");
   };
@@ -383,11 +384,15 @@ export default function App() {
   // Visible deals based on role
   const visibleDeals = useMemo(() => {
     if (!loggedInUser) return [];
-    // STRICT: RM can ONLY see their own customers. Admin sees all.
-    if (loggedInUser.role !== "admin") {
-      return deals.filter(d => d.rmUsername === loggedInUser.username);
+    // Admin sees ALL
+    if (loggedInUser.role === "admin") return deals;
+    // BM sees all customers in their assigned branches
+    if (loggedInUser.role === "bm") {
+      const bmBranches = loggedInUser.branches || [loggedInUser.branch];
+      return deals.filter(d => bmBranches.includes(d.branch));
     }
-    return deals;
+    // RM sees only their own customers
+    return deals.filter(d => d.rmUsername === loggedInUser.username);
   }, [deals, loggedInUser]);
 
   const filteredDeals = useMemo(() => {
@@ -575,8 +580,10 @@ export default function App() {
     if (exists) { showToast("❌ Username already exists!"); return; }
     const usersRef = collection(db, "artifacts", appId, "public", "data", "appUsers");
     if (editingUser) {
-      const updateData = { name: newUser.name, role: newUser.role, branch: newUser.branch };
-      // 🔐 Only hash+save password if it was changed
+      const updateData = {
+        name: newUser.name, role: newUser.role, branch: newUser.branch,
+        branches: newUser.role === "bm" ? (newUser.branches || [newUser.branch]) : [newUser.branch],
+      };
       if (newUser.password !== "••••••") {
         updateData.password = await hashPassword(newUser.password);
         updateData.passwordHashed = true;
@@ -584,12 +591,12 @@ export default function App() {
       await updateDoc(doc(db, "artifacts", appId, "public", "data", "appUsers", editingUser.id), updateData);
       showToast(`✅ User "${newUser.name}" updated!`);
     } else {
-      // 🔐 Always hash new user passwords
       const hashedPw = await hashPassword(newUser.password);
-      await addDoc(usersRef, { ...newUser, password: hashedPw, passwordHashed: true, createdAt: Date.now() });
+      const branches = newUser.role === "bm" ? (newUser.branches || [newUser.branch]) : [newUser.branch];
+      await addDoc(usersRef, { ...newUser, branches, password: hashedPw, passwordHashed: true, createdAt: Date.now() });
       showToast(`✅ User "${newUser.name}" created! Username: ${newUser.username}`);
     }
-    setNewUser({ username: "", password: "", name: "", role: "rm", branch: "NRD" });
+    setNewUser({ username: "", password: "", name: "", role: "rm", branch: "NRD", branches: [] });
     setEditingUser(null); setIsUserModalOpen(false);
   };
 
@@ -601,7 +608,7 @@ export default function App() {
 
   const handleEditUser = (u) => {
     setEditingUser(u);
-    setNewUser({ username: u.username, password: "••••••", name: u.name, role: u.role, branch: u.branch || "NRD" });
+    setNewUser({ username: u.username, password: "••••••", name: u.name, role: u.role, branch: u.branch || "NRD", branches: u.branches || [u.branch || "NRD"] });
     setIsUserModalOpen(true);
   };
 
@@ -641,7 +648,7 @@ export default function App() {
       <div className="pt-4 border-t border-white/10 mt-4">
         <div className="px-4 py-3 bg-white/5 rounded-xl mb-2 border border-white/10">
           <p className="text-sm font-bold text-white">{loggedInUser.name}</p>
-          <p className="text-xs text-slate-400">{isAdmin ? "🔑 Administrator" : "👤 RM"} • {loggedInUser.branch}</p>
+          <p className="text-xs text-slate-400">{isAdmin ? "🔑 Administrator" : isBM ? "🏦 Branch Manager" : "👤 RM"} • {loggedInUser.branch}</p>
         </div>
         <div className="mx-3 mb-2 px-3 py-2 rounded-xl bg-green-900/30 border border-green-700/30 flex items-center gap-2">
           <Shield size={13} className="text-green-400 flex-shrink-0" />
@@ -828,7 +835,7 @@ export default function App() {
                     </div>
                   </div>
                   {(() => {
-                    const perfList = (isAdmin ? rmList : [loggedInUser])
+                    const perfList = (isAdmin ? rmList : isBM ? rmList.filter(rm => { const bmBranches = loggedInUser.branches || [loggedInUser.branch]; return bmBranches.includes(rm.branch); }) : [loggedInUser])
                       .map(rm => {
                         let rmDeals = topPerfFilter === "all"
                           ? deals.filter(d => d.rmUsername === rm.username)
@@ -904,10 +911,12 @@ export default function App() {
                       </span>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <button onClick={() => setIsAddDealModalOpen(true)}
-                        className="flex items-center space-x-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white px-4 py-2 rounded-xl text-sm font-medium shadow-sm transition-all hover:shadow-md">
-                        <Plus size={16} /><span>New Customer</span>
-                      </button>
+                      {!isBM && (
+                        <button onClick={() => setIsAddDealModalOpen(true)}
+                          className="flex items-center space-x-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white px-4 py-2 rounded-xl text-sm font-medium shadow-sm transition-all hover:shadow-md">
+                          <Plus size={16} /><span>New Customer</span>
+                        </button>
+                      )}
                       <button onClick={() => {
                         let d = selectedTeamRm ? visibleDeals.filter(x => x.rmUsername === selectedTeamRm) : visibleDeals;
                         if (teamLoanType !== "all") d = d.filter(x => x.loanType === teamLoanType);
@@ -1049,16 +1058,19 @@ export default function App() {
                               <td className="p-4"><span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${statusBadge(deal.status)}`}>{deal.status === "Won" ? "Completed" : deal.status}</span></td>
                               <td className="p-4">
                                 <div className="flex items-center gap-2">
-                                  <button onClick={() => openEditDeal(deal)}
-                                    className="flex items-center space-x-1 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg text-xs font-medium transition-colors">
-                                    <Edit2 size={12} /><span>Edit</span>
-                                  </button>
+                                  {!isBM && (
+                                    <button onClick={() => openEditDeal(deal)}
+                                      className="flex items-center space-x-1 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg text-xs font-medium transition-colors">
+                                      <Edit2 size={12} /><span>Edit</span>
+                                    </button>
+                                  )}
                                   {isAdmin && (
                                     <button onClick={() => handleDeleteDeal(deal.id, deal.client)}
                                       className="flex items-center space-x-1 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg text-xs font-medium transition-colors">
                                       <Trash2 size={12} /><span>Del</span>
                                     </button>
                                   )}
+                                  {isBM && <span className="text-xs text-slate-400 italic">View only</span>}
                                 </div>
                               </td>
                             </tr>
@@ -1139,22 +1151,26 @@ export default function App() {
                   <div className="p-6 border-b flex justify-between items-center">
                     <div>
                       <h2 className="text-lg font-bold text-slate-800">User Created</h2>
-                      <p className="text-sm text-slate-500 mt-0.5">{appUsers.filter(u => u.role === "admin").length} admin accounts</p>
+                      <p className="text-sm text-slate-500 mt-0.5">{appUsers.length} total accounts</p>
                     </div>
-                    <button onClick={() => { setEditingUser(null); setNewUser({ username: "", password: "", name: "", role: "rm", branch: "NRD" }); setIsUserModalOpen(true); }}
+                    <button onClick={() => { setEditingUser(null); setNewUser({ username: "", password: "", name: "", role: "rm", branch: "NRD", branches: [] }); setIsUserModalOpen(true); }}
                       className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium">
                       <UserPlus size={18} /><span>Add New User</span>
                     </button>
                   </div>
                   {/* Stats row */}
-                  <div className="grid grid-cols-3 divide-x divide-slate-100 border-b border-slate-100">
+                  <div className="grid grid-cols-4 divide-x divide-slate-100 border-b border-slate-100">
                     <div className="p-4 text-center">
-                      <p className="text-2xl font-bold text-slate-800">{appUsers.filter(u => u.role === "admin").length}</p>
-                      <p className="text-xs text-slate-500 mt-1">Total Admins</p>
+                      <p className="text-2xl font-bold text-slate-800">{appUsers.length}</p>
+                      <p className="text-xs text-slate-500 mt-1">Total Users</p>
                     </div>
                     <div className="p-4 text-center">
                       <p className="text-2xl font-bold text-purple-600">{appUsers.filter(u => u.role === "admin").length}</p>
                       <p className="text-xs text-slate-500 mt-1">Admins</p>
+                    </div>
+                    <div className="p-4 text-center">
+                      <p className="text-2xl font-bold text-amber-600">{appUsers.filter(u => u.role === "bm").length}</p>
+                      <p className="text-xs text-slate-500 mt-1">Branch Managers</p>
                     </div>
                     <div className="p-4 text-center">
                       <p className="text-2xl font-bold text-indigo-600">{appUsers.filter(u => u.role === "rm").length}</p>
@@ -1162,13 +1178,13 @@ export default function App() {
                     </div>
                   </div>
                   <div className="divide-y divide-slate-100">
-                    {appUsers.filter(u => u.role === "admin").map(u => (
+                    {appUsers.map(u => (
                       <div key={u.id} className="flex items-center p-5 hover:bg-slate-50 transition-colors">
                         <div className="relative flex-shrink-0">
                           {u.photoUrl ? (
                             <img src={u.photoUrl} alt={u.name} className="w-11 h-11 rounded-full object-cover border-2 border-indigo-100" />
                           ) : (
-                            <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-lg ${u.role === "admin" ? "bg-purple-100 text-purple-600" : "bg-indigo-100 text-indigo-600"}`}>
+                            <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-lg ${u.role === "admin" ? "bg-purple-100 text-purple-600" : u.role === "bm" ? "bg-amber-100 text-amber-600" : "bg-indigo-100 text-indigo-600"}`}>
                               {u.name?.charAt(0).toUpperCase()}
                             </div>
                           )}
@@ -1180,14 +1196,17 @@ export default function App() {
                         <div className="ml-4 flex-1 min-w-0">
                           <div className="flex items-center space-x-2 flex-wrap gap-1">
                             <p className="font-bold text-slate-800">{u.name}</p>
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${u.role === "admin" ? "bg-purple-100 text-purple-700" : "bg-indigo-100 text-indigo-700"}`}>
-                              {u.role === "admin" ? "🔑 Admin" : "👤 RM"}
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${u.role === "admin" ? "bg-purple-100 text-purple-700" : u.role === "bm" ? "bg-amber-100 text-amber-700" : "bg-indigo-100 text-indigo-700"}`}>
+                              {u.role === "admin" ? "🔑 Admin" : u.role === "bm" ? "🏦 BM" : "👤 RM"}
                             </span>
                             {u.username === loggedInUser.username && (
                               <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">You</span>
                             )}
                           </div>
                           <p className="text-sm text-slate-500 mt-0.5">@{u.username} • Branch: <span className="font-semibold text-slate-700">{u.branch}</span></p>
+                          {u.role === "bm" && u.branches && u.branches.length > 1 && (
+                            <p className="text-xs text-amber-600 mt-0.5">🏦 Controls: {u.branches.join(", ")}</p>
+                          )}
                           <div className="flex items-center space-x-3 mt-1">
                             <span className="text-xs text-slate-400">🔒 Password: <span className="font-mono tracking-widest">••••••</span></span>
                             <span className="text-xs text-slate-400">📁 {deals.filter(d => d.rmUsername === u.username).length} customers</span>
@@ -1300,8 +1319,8 @@ export default function App() {
                             </div>
                             <p className="text-xs text-slate-400">Branch: {u.branch}</p>
                           </div>
-                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${u.role === "admin" ? "bg-purple-100 text-purple-700" : "bg-indigo-100 text-indigo-700"}`}>
-                            {u.role === "admin" ? "🔑 Admin" : "👤 RM"}
+                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${u.role === "admin" ? "bg-purple-100 text-purple-700" : u.role === "bm" ? "bg-amber-100 text-amber-700" : "bg-indigo-100 text-indigo-700"}`}>
+                            {u.role === "admin" ? "🔑 Admin" : u.role === "bm" ? "🏦 BM" : "👤 RM"}
                           </span>
                         </div>
                       ))}
@@ -1541,17 +1560,42 @@ export default function App() {
                   <select value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })}
                     className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500">
                     <option value="rm">👤 Relationship Manager</option>
+                    <option value="bm">🏦 Branch Manager</option>
                     <option value="admin">🔑 Administrator</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Branch</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Primary Branch</label>
                   <select value={newUser.branch} onChange={e => setNewUser({ ...newUser, branch: e.target.value })}
                     className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500">
                     {BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
                   </select>
                 </div>
               </div>
+              {newUser.role === "bm" && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    🏦 Assigned Branches <span className="text-xs text-slate-400">(tick all branches this BM controls)</span>
+                  </label>
+                  <div className="grid grid-cols-4 gap-2 p-3 bg-indigo-50 border border-indigo-200 rounded-xl">
+                    {BRANCHES.map(b => {
+                      const checked = (newUser.branches || [newUser.branch]).includes(b);
+                      return (
+                        <label key={b} className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg cursor-pointer text-xs font-medium transition-all ${checked ? "bg-indigo-600 text-white" : "bg-white text-slate-600 border border-slate-200 hover:border-indigo-300"}`}>
+                          <input type="checkbox" checked={checked} className="hidden"
+                            onChange={e => {
+                              const cur = newUser.branches || [newUser.branch];
+                              const next = e.target.checked ? [...new Set([...cur, b])] : cur.filter(x => x !== b);
+                              setNewUser({ ...newUser, branches: next.length ? next : [newUser.branch] });
+                            }} />
+                          {b}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-indigo-600 mt-1.5">✅ Selected: {(newUser.branches || [newUser.branch]).join(", ")}</p>
+                </div>
+              )}
               <div className="flex space-x-3 pt-2">
                 <button type="button" onClick={() => setIsUserModalOpen(false)} className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl">Cancel</button>
                 <button type="submit" className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700">{editingUser ? "Update" : "Create User"}</button>
