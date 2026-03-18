@@ -296,6 +296,8 @@ export default function App() {
   const [topPerfStartDate, setTopPerfStartDate] = useState("");
   const [topPerfEndDate, setTopPerfEndDate] = useState("");
   const [topPerfLoanType, setTopPerfLoanType] = useState("all");
+  const [topPerfBranch, setTopPerfBranch] = useState("all");
+  const [followUpSearch, setFollowUpSearch] = useState("");
   const [isEditDealModalOpen, setIsEditDealModalOpen] = useState(false);
   const [editDealForm, setEditDealForm] = useState({});
   const [followUps, setFollowUps] = useState([]);
@@ -308,6 +310,7 @@ export default function App() {
     client: "", businessName: "", phone: "", branch: loggedInUser?.branch || "NRD",
     amount: "", approvedAmount: "", repUsername: "", status: "Pending",
     loanType: "Personal Loan", rate: "", tenor: "", incomeStatus: "Pending", incomeType: "Salary", incomeAmount: "", customerStatus: "Medium",
+    existingBank: "", loanOutstanding: "", existingRate: "", maturityDate: "",
   });
 
   const isAdmin = loggedInUser?.role === "admin";
@@ -502,11 +505,15 @@ export default function App() {
       incomeAmount: parseFloat(newDeal.incomeAmount) || 0,
       customerStatus: newDeal.customerStatus || "Medium",
       approvedAmount: parseFloat(newDeal.approvedAmount) || 0,
+      existingBank: newDeal.existingBank || "",
+      loanOutstanding: parseFloat(newDeal.loanOutstanding) || 0,
+      existingRate: parseFloat(newDeal.existingRate) || 0,
+      maturityDate: newDeal.maturityDate || "",
       date: new Date().toISOString().split("T")[0], createdAt: Date.now(),
     };
     try {
       await addDoc(collection(db, "artifacts", appId, "public", "data", "deals"), deal);
-      setNewDeal({ client: "", businessName: "", phone: "", branch: loggedInUser?.branch || "NRD", amount: "", approvedAmount: "", repUsername: "", status: "Pending", loanType: "Personal Loan", rate: "", tenor: "", incomeStatus: "Pending", incomeType: "Salary", incomeAmount: "", customerStatus: "Medium" });
+      setNewDeal({ client: "", businessName: "", phone: "", branch: loggedInUser?.branch || "NRD", amount: "", approvedAmount: "", repUsername: "", status: "Pending", loanType: "Personal Loan", rate: "", tenor: "", incomeStatus: "Pending", incomeType: "Salary", incomeAmount: "", customerStatus: "Medium", existingBank: "", loanOutstanding: "", existingRate: "", maturityDate: "" });
       setIsAddDealModalOpen(false);
       showToast(`✅ Customer "${deal.client}" created! RM: ${deal.rmName}`);
     } catch (err) { console.error(err); }
@@ -642,11 +649,12 @@ export default function App() {
         startDate: followUpForm.startDate,
         endDate: followUpForm.endDate,
         remark: followUpForm.remark.trim(),
+        status: followUpForm.status || "Medium",
         createdAt: Date.now(),
         locked: true,
       });
       setIsFollowUpModalOpen(false);
-      setFollowUpForm({ startDate: "", endDate: "", remark: "" });
+      setFollowUpForm({ startDate: "", endDate: "", remark: "", status: "Medium" });
       setSelectedDealForFollowUp(null);
       showToast(`✅ Follow-up saved for "${selectedDealForFollowUp.client}"!`);
     } catch (err) { console.error(err); showToast("❌ Failed to save. Try again."); }
@@ -853,6 +861,12 @@ export default function App() {
                         <option value="Rejected">❌ Rejected</option>
                         <option value="all">🌐 Total (All Status)</option>
                       </select>
+                      {/* Branch filter */}
+                      <select value={topPerfBranch} onChange={e => setTopPerfBranch(e.target.value)}
+                        className="text-xs border border-slate-200 bg-white rounded-xl px-3 py-2 outline-none focus:border-indigo-400 text-slate-700 font-medium shadow-sm flex-1 min-w-[120px]">
+                        <option value="all">🏦 All Branches</option>
+                        {BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
+                      </select>
                       {/* Product Type */}
                       <select value={topPerfLoanType} onChange={e => setTopPerfLoanType(e.target.value)}
                         className="text-xs border border-slate-200 bg-white rounded-xl px-3 py-2 outline-none focus:border-indigo-400 text-slate-700 font-medium shadow-sm flex-1 min-w-[130px]">
@@ -872,54 +886,52 @@ export default function App() {
                           className="text-xs border border-slate-200 bg-white rounded-xl px-2 py-2 outline-none focus:border-indigo-400 text-slate-700 w-full shadow-sm" />
                       </div>
                       {/* Reset */}
-                      {(topPerfStartDate || topPerfEndDate || topPerfLoanType !== "all") && (
-                        <button onClick={() => { setTopPerfStartDate(""); setTopPerfEndDate(""); setTopPerfLoanType("all"); }}
+                      {(topPerfStartDate || topPerfEndDate || topPerfLoanType !== "all" || topPerfBranch !== "all") && (
+                        <button onClick={() => { setTopPerfStartDate(""); setTopPerfEndDate(""); setTopPerfLoanType("all"); setTopPerfBranch("all"); }}
                           className="text-xs text-slate-400 hover:text-red-500 px-2 py-2 rounded-xl hover:bg-red-50 transition-colors whitespace-nowrap">✕ Reset</button>
                       )}
                     </div>
                   </div>
                   {(() => {
-                    const perfList = (isAdmin ? rmList : isBM ? rmList.filter(rm => { const bmBranches = loggedInUser.branches || [loggedInUser.branch]; return bmBranches.includes(rm.branch); }) : [loggedInUser])
-                      .map(rm => {
-                        let rmDeals = topPerfFilter === "all"
-                          ? deals.filter(d => d.rmUsername === rm.username)
-                          : deals.filter(d => d.rmUsername === rm.username && d.status === topPerfFilter);
-                        // Apply loan type filter
-                        if (topPerfLoanType !== "all") rmDeals = rmDeals.filter(d => d.loanType === topPerfLoanType);
-                        // Apply date range filter
-                        if (topPerfStartDate) rmDeals = rmDeals.filter(d => d.date >= topPerfStartDate);
-                        if (topPerfEndDate) rmDeals = rmDeals.filter(d => d.date <= topPerfEndDate);
-                        const total = rmDeals.reduce((s, d) => s + d.amount, 0);
-                        return { ...rm, filteredCount: rmDeals.length, filteredTotal: total };
+                    // Group by BRANCH instead of RM
+                    const branchesToShow = isAdmin ? BRANCHES : isBM ? (loggedInUser.branches || [loggedInUser.branch]) : [loggedInUser.branch];
+                    const perfList = branchesToShow
+                      .filter(br => topPerfBranch === "all" || br === topPerfBranch)
+                      .map(br => {
+                        let brDeals = topPerfFilter === "all"
+                          ? deals.filter(d => d.branch === br)
+                          : deals.filter(d => d.branch === br && d.status === topPerfFilter);
+                        if (topPerfLoanType !== "all") brDeals = brDeals.filter(d => d.loanType === topPerfLoanType);
+                        if (topPerfStartDate) brDeals = brDeals.filter(d => d.date >= topPerfStartDate);
+                        if (topPerfEndDate) brDeals = brDeals.filter(d => d.date <= topPerfEndDate);
+                        const total = brDeals.reduce((s, d) => s + d.amount, 0);
+                        return { branch: br, filteredCount: brDeals.length, filteredTotal: total };
                       })
                       .sort((a, b) => b.filteredTotal - a.filteredTotal || b.filteredCount - a.filteredCount);
                     const maxVal = perfList[0]?.filteredTotal || 1;
                     const filterLabel = { all:"Total (All Status)", Won:"Completed Drawdown", Pending:"Pipeline", "Pre-Approval":"Pre-Approval", Processing:"Processing", LOS:"LOS", LOO:"LOO", Rejected:"Rejected" }[topPerfFilter] || topPerfFilter;
-                    return perfList.map((rm, i) => (
-                      <div key={rm.id || rm.username}
-                        onClick={() => setStatusFilterModal({ title: `${rm.name} — ${filterLabel}`, status: topPerfFilter === "all" ? "all_rm" : topPerfFilter, rmUsername: rm.username })}
+                    return perfList.map((br, i) => (
+                      <div key={br.branch}
+                        onClick={() => setStatusFilterModal({ title: `Branch ${br.branch} — ${filterLabel}`, status: topPerfFilter === "all" ? "all" : topPerfFilter, branchFilter: br.branch })}
                         className="flex items-center px-5 py-4 border-b border-slate-50 last:border-0 hover:bg-indigo-50/40 transition-colors cursor-pointer">
                         <span className={`font-extrabold w-7 text-base flex-shrink-0 ${i === 0 ? "text-amber-400" : i === 1 ? "text-slate-400" : i === 2 ? "text-orange-400" : "text-slate-300"}`}>
                           {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i+1}`}
                         </span>
-                        <div className="w-10 h-10 rounded-full overflow-hidden ml-1 flex-shrink-0">
-                          {rm.photoUrl
-                            ? <img src={rm.photoUrl} alt={rm.name} className="w-full h-full object-cover" />
-                            : <div className="w-full h-full bg-indigo-100 flex items-center justify-center font-bold text-indigo-600">{rm.name?.charAt(0)}</div>}
+                        <div className="w-10 h-10 rounded-full overflow-hidden ml-1 flex-shrink-0 bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center">
+                          <span className="text-white font-bold text-xs">{br.branch.substring(0,3)}</span>
                         </div>
                         <div className="ml-3 flex-1 min-w-0">
-                          <p className="font-bold text-slate-800">{rm.name}</p>
+                          <p className="font-bold text-slate-800">🏦 {br.branch}</p>
                           <div className="flex items-center gap-2 mt-1">
                             <div className="flex-1 bg-slate-100 h-1.5 rounded-full overflow-hidden">
                               <div className={`h-full rounded-full ${i === 0 ? "bg-amber-400" : i === 1 ? "bg-slate-400" : i === 2 ? "bg-orange-400" : "bg-indigo-300"}`}
-                                style={{ width: `${maxVal > 0 ? Math.round((rm.filteredTotal/maxVal)*100) : 0}%`, transition:"width 0.8s ease" }}></div>
+                                style={{ width: `${maxVal > 0 ? Math.round((br.filteredTotal/maxVal)*100) : 0}%`, transition:"width 0.8s ease" }}></div>
                             </div>
-                            <span className="text-xs text-slate-400 flex-shrink-0">{rm.filteredCount} {filterLabel}</span>
+                            <span className="text-xs text-slate-400 flex-shrink-0">{br.filteredCount} {filterLabel}</span>
                           </div>
                         </div>
                         <div className="text-right ml-4">
-                          <p className="font-bold text-emerald-600 text-sm">{formatCurrency(rm.filteredTotal)}</p>
-                          <p className="text-xs text-slate-400">{rm.branch}</p>
+                          <p className="font-bold text-emerald-600 text-sm">{formatCurrency(br.filteredTotal)}</p>
                           <p className="text-xs text-indigo-400 mt-0.5">click to view →</p>
                         </div>
                       </div>
@@ -1127,21 +1139,115 @@ export default function App() {
           {activeTab === "deals" && (
             <div className="max-w-7xl mx-auto space-y-6">
 
-              {/* Header + Filter */}
+              {/* Customer List */}
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                 <div className="p-5 border-b bg-gradient-to-r from-slate-50 to-indigo-50/30">
-                  <div className="flex flex-wrap gap-3 items-center justify-between mb-4">
+                  <div className="flex flex-wrap gap-3 items-center justify-between mb-3">
                     <div>
                       <h2 className="text-lg font-bold text-slate-800 flex items-center">
                         <span className="w-1 h-5 bg-gradient-to-b from-indigo-500 to-blue-500 rounded-full mr-3 inline-block"></span>
                         📋 Create Follow Up
                       </h2>
-                      <p className="text-xs text-slate-400 mt-1 ml-4">Click on a customer to add a follow-up note</p>
+                      <p className="text-xs text-slate-400 mt-1 ml-4">Click ➕ Follow Up on any customer to add a note</p>
                     </div>
                   </div>
-                  {/* Date filter for follow-up history */}
+                  {/* Search bar */}
+                  <div className="relative">
+                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input type="text" value={followUpSearch} onChange={e => setFollowUpSearch(e.target.value)}
+                      placeholder="Search by customer name or RM name..."
+                      className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-400 text-sm text-slate-700" />
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200">
+                        <th className="p-4">No.</th>
+                        <th className="p-4">Customer</th>
+                        <th className="p-4">Branch</th>
+                        <th className="p-4">Product</th>
+                        <th className="p-4">Amount</th>
+                        <th className="p-4">Rate</th>
+                        <th className="p-4">Date Created</th>
+                        <th className="p-4">Follow-ups</th>
+                        <th className="p-4">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredDeals
+                        .filter(d => {
+                          if (!followUpSearch.trim()) return true;
+                          const q = followUpSearch.toLowerCase();
+                          return d.client?.toLowerCase().includes(q) || d.rmName?.toLowerCase().includes(q);
+                        })
+                        .map((deal, idx) => {
+                          const dealFollowUps = followUps.filter(f => f.dealId === deal.id);
+                          return (
+                            <tr key={deal.id} className="hover:bg-indigo-50/30 transition-colors">
+                              <td className="p-4 text-slate-400 text-sm font-medium">{idx + 1}</td>
+                              <td className="p-4">
+                                <p className="font-semibold text-slate-800">{deal.client}</p>
+                                {deal.businessName && <p className="text-xs text-slate-400">{deal.businessName}</p>}
+                                <p className="text-xs text-slate-400">👤 {deal.rmName}</p>
+                              </td>
+                              <td className="p-4"><span className="px-2 py-1 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-lg">{deal.branch || "—"}</span></td>
+                              <td className="p-4"><span className="text-xs text-slate-600">{deal.loanType || "—"}</span></td>
+                              <td className="p-4"><span className="font-bold text-slate-700">{formatCurrency(deal.amount)}</span></td>
+                              <td className="p-4"><span className="text-sm text-slate-600">{deal.rate ? `${deal.rate}%` : "—"}</span></td>
+                              <td className="p-4"><span className="text-xs text-slate-500">{new Date(deal.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span></td>
+                              <td className="p-4">
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${dealFollowUps.length > 0 ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-400"}`}>
+                                    {dealFollowUps.length} note{dealFollowUps.length !== 1 ? "s" : ""}
+                                  </span>
+                                  {dealFollowUps.length > 0 && (
+                                    <button onClick={() => setFollowUpFilter(p => ({ ...p, viewDealId: deal.id }))}
+                                      className="px-2 py-1 bg-amber-50 text-amber-700 text-xs font-medium rounded-lg hover:bg-amber-100 transition-colors">
+                                      👁 View
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="p-4">
+                                <button onClick={() => { setSelectedDealForFollowUp(deal); setFollowUpForm({ startDate: "", endDate: "", remark: "", status: "Medium" }); setIsFollowUpModalOpen(true); }}
+                                  className="flex items-center space-x-1 px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white rounded-lg text-xs font-medium transition-colors shadow-sm">
+                                  <Plus size={12} /><span>Follow Up</span>
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Follow-up History */}
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                <div className="p-5 border-b bg-gradient-to-r from-slate-50 to-amber-50/30">
+                  <div className="flex flex-wrap gap-3 items-center justify-between mb-3">
+                    <h3 className="text-lg font-bold text-slate-800 flex items-center">
+                      <span className="w-1 h-5 bg-gradient-to-b from-amber-500 to-orange-500 rounded-full mr-3 inline-block"></span>
+                      📝 Follow-up History
+                      <span className="ml-3 text-xs bg-amber-100 text-amber-700 font-semibold px-2.5 py-1 rounded-full">
+                        {(() => {
+                          let f = isAdmin || isBM ? followUps : followUps.filter(f => f.rmUsername === loggedInUser.username);
+                          if (followUpFilter.start) f = f.filter(x => x.startDate >= followUpFilter.start);
+                          if (followUpFilter.end) f = f.filter(x => x.endDate <= followUpFilter.end);
+                          if (followUpFilter.viewDealId) f = f.filter(x => x.dealId === followUpFilter.viewDealId);
+                          return f.length;
+                        })()} records
+                      </span>
+                    </h3>
+                    {followUpFilter.viewDealId && (
+                      <button onClick={() => setFollowUpFilter(p => ({ ...p, viewDealId: null }))}
+                        className="text-xs text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg font-medium">✕ Show All</button>
+                    )}
+                  </div>
+                  {/* Date filter — moved here */}
                   <div className="flex flex-wrap gap-2 items-center">
-                    <span className="text-xs text-slate-500 font-medium">🔍 Filter history:</span>
+                    <span className="text-xs text-slate-500 font-medium">🔍 Filter:</span>
                     <div className="flex items-center gap-1">
                       <span className="text-xs text-slate-400 whitespace-nowrap">From</span>
                       <input type="date" value={followUpFilter.start} onChange={e => setFollowUpFilter(p => ({ ...p, start: e.target.value }))}
@@ -1153,82 +1259,17 @@ export default function App() {
                         className="text-xs border border-slate-200 bg-white rounded-xl px-2 py-2 outline-none focus:border-indigo-400 text-slate-700 shadow-sm" />
                     </div>
                     {(followUpFilter.start || followUpFilter.end) && (
-                      <button onClick={() => setFollowUpFilter({ start: "", end: "" })}
+                      <button onClick={() => setFollowUpFilter(p => ({ ...p, start: "", end: "" }))}
                         className="text-xs text-red-400 hover:text-red-600 px-2 py-2 rounded-xl hover:bg-red-50 transition-colors whitespace-nowrap">✕ Reset</button>
                     )}
                   </div>
-                </div>
-
-                {/* Customer list — click to add follow-up */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200">
-                        <th className="p-4">#</th>
-                        <th className="p-4">Customer</th>
-                        <th className="p-4">Branch</th>
-                        <th className="p-4">Amount</th>
-                        <th className="p-4">Rate</th>
-                        <th className="p-4">Date Created</th>
-                        <th className="p-4">Follow-ups</th>
-                        <th className="p-4">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {filteredDeals.map((deal, idx) => {
-                        const dealFollowUps = followUps.filter(f => f.dealId === deal.id);
-                        return (
-                          <tr key={deal.id} className="hover:bg-indigo-50/30 transition-colors">
-                            <td className="p-4 text-slate-400 text-sm">{idx + 1}</td>
-                            <td className="p-4">
-                              <p className="font-semibold text-slate-800">{deal.client}</p>
-                              {deal.businessName && <p className="text-xs text-slate-400">{deal.businessName}</p>}
-                              <p className="text-xs text-slate-400">{deal.rmName}</p>
-                            </td>
-                            <td className="p-4"><span className="px-2 py-1 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-lg">{deal.branch || "—"}</span></td>
-                            <td className="p-4"><span className="font-bold text-slate-700">{formatCurrency(deal.amount)}</span></td>
-                            <td className="p-4"><span className="text-sm text-slate-600">{deal.rate ? `${deal.rate}%` : "—"}</span></td>
-                            <td className="p-4"><span className="text-xs text-slate-500">{new Date(deal.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span></td>
-                            <td className="p-4">
-                              <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${dealFollowUps.length > 0 ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-400"}`}>
-                                {dealFollowUps.length} follow-up{dealFollowUps.length !== 1 ? "s" : ""}
-                              </span>
-                            </td>
-                            <td className="p-4">
-                              <button onClick={() => { setSelectedDealForFollowUp(deal); setFollowUpForm({ startDate: "", endDate: "", remark: "" }); setIsFollowUpModalOpen(true); }}
-                                className="flex items-center space-x-1 px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white rounded-lg text-xs font-medium transition-colors shadow-sm">
-                                <Plus size={12} /><span>Follow Up</span>
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Follow-up History */}
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                <div className="p-5 border-b bg-gradient-to-r from-slate-50 to-amber-50/30">
-                  <h3 className="text-lg font-bold text-slate-800 flex items-center">
-                    <span className="w-1 h-5 bg-gradient-to-b from-amber-500 to-orange-500 rounded-full mr-3 inline-block"></span>
-                    📝 Follow-up History
-                    <span className="ml-3 text-xs bg-amber-100 text-amber-700 font-semibold px-2.5 py-1 rounded-full">
-                      {(() => {
-                        let f = isAdmin || isBM ? followUps : followUps.filter(f => f.rmUsername === loggedInUser.username);
-                        if (followUpFilter.start) f = f.filter(x => x.startDate >= followUpFilter.start);
-                        if (followUpFilter.end) f = f.filter(x => x.endDate <= followUpFilter.end);
-                        return f.length;
-                      })()} records
-                    </span>
-                  </h3>
                 </div>
                 <div className="divide-y divide-slate-100">
                   {(() => {
                     let filtered = isAdmin || isBM ? followUps : followUps.filter(f => f.rmUsername === loggedInUser.username);
                     if (followUpFilter.start) filtered = filtered.filter(x => x.startDate >= followUpFilter.start);
                     if (followUpFilter.end) filtered = filtered.filter(x => x.endDate <= followUpFilter.end);
+                    if (followUpFilter.viewDealId) filtered = filtered.filter(x => x.dealId === followUpFilter.viewDealId);
                     if (!filtered.length) return (
                       <div className="py-16 text-center text-slate-400">
                         <CheckCircle size={40} className="mx-auto mb-3 opacity-20" />
@@ -1246,12 +1287,14 @@ export default function App() {
                               <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-lg">{formatCurrency(f.amount)}</span>
                               {f.rate && <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs font-semibold rounded-lg">{f.rate}%</span>}
                               <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-xs rounded-lg">Created: {new Date(f.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                              {/* Priority Status */}
+                              <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${f.status === "High" ? "bg-red-50 text-red-600 border-red-200" : f.status === "Low" ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-amber-50 text-amber-600 border-amber-200"}`}>
+                                {f.status === "High" ? "🔴 High" : f.status === "Low" ? "🟢 Low" : "🟡 Medium"}
+                              </span>
                             </div>
-                            {/* Remark */}
                             <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mt-2">
                               <p className="text-sm text-slate-700 leading-relaxed">💬 {f.remark}</p>
                             </div>
-                            {/* Follow up dates */}
                             <div className="flex items-center gap-4 mt-2 flex-wrap">
                               <div className="flex items-center gap-1.5">
                                 <span className="text-xs text-slate-400">📅 Follow-up:</span>
@@ -1264,7 +1307,7 @@ export default function App() {
                           </div>
                           <div className="text-right flex-shrink-0">
                             <p className="text-xs font-semibold text-slate-600">👤 {f.rmName}</p>
-                            <p className="text-xs text-slate-400 mt-0.5">{new Date(f.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+                            <p className="text-xs text-slate-400 mt-0.5">{new Date(f.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
                           </div>
                         </div>
                       </div>
@@ -1768,9 +1811,12 @@ export default function App() {
               {(() => {
                 let filtered;
                 if (statusFilterModal.filteredDeals) {
-                  // KPI card click — already pre-filtered by date/product
                   const src = statusFilterModal.filteredDeals;
                   filtered = statusFilterModal.status === "all" ? src : src.filter(d => d.status === statusFilterModal.status);
+                } else if (statusFilterModal.branchFilter) {
+                  filtered = statusFilterModal.status === "all"
+                    ? deals.filter(d => d.branch === statusFilterModal.branchFilter)
+                    : deals.filter(d => d.branch === statusFilterModal.branchFilter && d.status === statusFilterModal.status);
                 } else if (statusFilterModal.status === "all_rm") filtered = visibleDeals.filter(d => d.rmUsername === statusFilterModal.rmUsername);
                 else if (statusFilterModal.status === "all") filtered = visibleDeals;
                 else if (statusFilterModal.rmUsername) filtered = visibleDeals.filter(d => d.status === statusFilterModal.status && d.rmUsername === statusFilterModal.rmUsername);
@@ -2086,6 +2132,15 @@ export default function App() {
                       onChange={e => setFollowUpForm(p => ({ ...p, endDate: e.target.value }))}
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-sm" />
                   </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Priority Status <span className="text-red-500">*</span></label>
+                  <select value={followUpForm.status || "Medium"} onChange={e => setFollowUpForm(p => ({ ...p, status: e.target.value }))}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-sm">
+                    <option value="High">🔴 High</option>
+                    <option value="Medium">🟡 Medium</option>
+                    <option value="Low">🟢 Low</option>
+                  </select>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Remark <span className="text-red-500">*</span></label>
