@@ -288,15 +288,19 @@ export default function App() {
   const [selectedTeamRm, setSelectedTeamRm] = useState(null);
   const [teamStartDate, setTeamStartDate] = useState("");
   const [teamEndDate, setTeamEndDate] = useState("");
-  const [teamLoanType, setTeamLoanType] = useState("all");
-  const [teamLoanStatus, setTeamLoanStatus] = useState("all");
-  const [teamCustStatus, setTeamCustStatus] = useState("all");
+  const [teamLoanType, setTeamLoanType] = useState([]);
+  const [teamLoanStatus, setTeamLoanStatus] = useState([]);
+  const [teamCustStatus, setTeamCustStatus] = useState([]);
+  const [isViewCustomerModal, setIsViewCustomerModal] = useState(false);
+  const [viewingCustomer, setViewingCustomer] = useState(null);
+  const [isViewFollowUpModal, setIsViewFollowUpModal] = useState(false);
+  const [viewingFollowUps, setViewingFollowUps] = useState([]);
   const [editingDeal, setEditingDeal] = useState(null); // deal being edited
-  const [topPerfFilter, setTopPerfFilter] = useState("Pending"); // Top Performance dropdown
+  const [topPerfFilter, setTopPerfFilter] = useState([]);
   const [topPerfStartDate, setTopPerfStartDate] = useState("");
   const [topPerfEndDate, setTopPerfEndDate] = useState("");
-  const [topPerfLoanType, setTopPerfLoanType] = useState("all");
-  const [topPerfBranch, setTopPerfBranch] = useState("all");
+  const [topPerfLoanType, setTopPerfLoanType] = useState([]);
+  const [topPerfBranch, setTopPerfBranch] = useState([]);
   const [followUpSearch, setFollowUpSearch] = useState("");
   const [isEditDealModalOpen, setIsEditDealModalOpen] = useState(false);
   const [editDealForm, setEditDealForm] = useState({});
@@ -318,6 +322,9 @@ export default function App() {
   const rmList = appUsers.filter(u => u.role === "rm");
 
   const showToast = (msg) => { setSuccessToast(msg); setTimeout(() => setSuccessToast(null), 3500); };
+
+  // Multi-select toggle helper
+  const toggleArr = (arr, val) => arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val];
 
   // Export customers to Excel/CSV
   const handleExportCustomers = (dealsToExport) => {
@@ -776,21 +783,23 @@ export default function App() {
               </div>
 
               {/* Active filter indicator */}
-              {(topPerfStartDate || topPerfEndDate || topPerfLoanType !== "all") && (
+              {(topPerfStartDate || topPerfEndDate || topPerfLoanType.length > 0 || topPerfBranch.length > 0 || topPerfFilter.length > 0) && (
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs text-slate-500 font-medium">🔍 Filters active:</span>
-                  {topPerfLoanType !== "all" && <span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-full">{topPerfLoanType}</span>}
+                  {topPerfFilter.map(s => <span key={s} className="px-2.5 py-1 bg-amber-100 text-amber-700 text-xs font-semibold rounded-full">{s}</span>)}
+                  {topPerfBranch.map(b => <span key={b} className="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-full">{b}</span>)}
+                  {topPerfLoanType.map(t => <span key={t} className="px-2.5 py-1 bg-purple-100 text-purple-700 text-xs font-semibold rounded-full">{t}</span>)}
                   {topPerfStartDate && <span className="px-2.5 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">From: {topPerfStartDate}</span>}
                   {topPerfEndDate && <span className="px-2.5 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">To: {topPerfEndDate}</span>}
-                  <button onClick={() => { setTopPerfStartDate(""); setTopPerfEndDate(""); setTopPerfLoanType("all"); }} className="text-xs text-red-400 hover:text-red-600 font-medium">✕ Clear all</button>
+                  <button onClick={() => { setTopPerfStartDate(""); setTopPerfEndDate(""); setTopPerfLoanType([]); setTopPerfBranch([]); setTopPerfFilter([]); }} className="text-xs text-red-400 hover:text-red-600 font-medium">✕ Clear all</button>
                 </div>
               )}
 
               {/* KPI Cards - Banking Style */}
               {(() => {
-                // Apply same date + product filters as Top Performance to KPI cards
                 let dashDeals = visibleDeals;
-                if (topPerfLoanType !== "all") dashDeals = dashDeals.filter(d => d.loanType === topPerfLoanType);
+                if (topPerfLoanType.length > 0) dashDeals = dashDeals.filter(d => topPerfLoanType.includes(d.loanType));
+                if (topPerfBranch.length > 0) dashDeals = dashDeals.filter(d => topPerfBranch.includes(d.branch));
                 if (topPerfStartDate) dashDeals = dashDeals.filter(d => d.date >= topPerfStartDate);
                 if (topPerfEndDate) dashDeals = dashDeals.filter(d => d.date <= topPerfEndDate);
                 const amt = (st) => dashDeals.filter(d=>d.status===st).reduce((s,d)=>s+d.amount,0);
@@ -838,7 +847,8 @@ export default function App() {
                       </h3>
                       <button onClick={() => {
                         let d = visibleDeals;
-                        if (topPerfLoanType !== "all") d = d.filter(x => x.loanType === topPerfLoanType);
+                        if (topPerfLoanType.length > 0) d = d.filter(x => topPerfLoanType.includes(x.loanType));
+                        if (topPerfBranch.length > 0) d = d.filter(x => topPerfBranch.includes(x.branch));
                         if (topPerfStartDate) d = d.filter(x => x.date >= topPerfStartDate);
                         if (topPerfEndDate) d = d.filter(x => x.date <= topPerfEndDate);
                         handleExportCustomers(d);
@@ -847,61 +857,68 @@ export default function App() {
                         <FileDown size={16} /><span>📊 Export Excel</span>
                       </button>
                     </div>
-                    {/* Filter row */}
-                    <div className="flex flex-wrap gap-2 items-center">
-                      {/* Status */}
-                      <select value={topPerfFilter} onChange={e => setTopPerfFilter(e.target.value)}
-                        className="text-xs border border-slate-200 bg-white rounded-xl px-3 py-2 outline-none focus:border-indigo-400 text-slate-700 font-medium shadow-sm flex-1 min-w-[130px]">
-                        <option value="Pending">⏳ Pipeline</option>
-                        <option value="Pre-Approval">✅ Pre-Approval</option>
-                        <option value="Processing">🔄 Processing</option>
-                        <option value="LOS">📁 LOS</option>
-                        <option value="LOO">⭐ LOO</option>
-                        <option value="Won">🏦 Completed Drawdown</option>
-                        <option value="Rejected">❌ Rejected</option>
-                        <option value="all">🌐 Total (All Status)</option>
-                      </select>
-                      {/* Branch filter */}
-                      <select value={topPerfBranch} onChange={e => setTopPerfBranch(e.target.value)}
-                        className="text-xs border border-slate-200 bg-white rounded-xl px-3 py-2 outline-none focus:border-indigo-400 text-slate-700 font-medium shadow-sm flex-1 min-w-[120px]">
-                        <option value="all">🏦 All Branches</option>
-                        {BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
-                      </select>
-                      {/* Product Type */}
-                      <select value={topPerfLoanType} onChange={e => setTopPerfLoanType(e.target.value)}
-                        className="text-xs border border-slate-200 bg-white rounded-xl px-3 py-2 outline-none focus:border-indigo-400 text-slate-700 font-medium shadow-sm flex-1 min-w-[130px]">
-                        <option value="all">📦 All Products</option>
-                        {LOAN_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                      </select>
-                      {/* Start Date */}
-                      <div className="flex items-center gap-1 flex-1 min-w-[120px]">
-                        <span className="text-xs text-slate-400 font-medium whitespace-nowrap">From</span>
-                        <input type="date" value={topPerfStartDate} onChange={e => setTopPerfStartDate(e.target.value)}
-                          className="text-xs border border-slate-200 bg-white rounded-xl px-2 py-2 outline-none focus:border-indigo-400 text-slate-700 w-full shadow-sm" />
+                    {/* Multi-select filter chips */}
+                    <div className="space-y-2">
+                      {/* Status chips */}
+                      <div className="flex flex-wrap gap-1.5 items-center">
+                        <span className="text-xs text-slate-400 font-medium w-14">Status:</span>
+                        {[["Pending","⏳ Pipeline"],["Pre-Approval","✅ Pre-Approval"],["Processing","🔄 Processing"],["LOS","📁 LOS"],["LOO","⭐ LOO"],["Won","🏦 Completed"],["Rejected","❌ Rejected"]].map(([val,label]) => (
+                          <button key={val} onClick={() => setTopPerfFilter(a => toggleArr(a, val))}
+                            className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${topPerfFilter.includes(val) ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"}`}>
+                            {label}
+                          </button>
+                        ))}
                       </div>
-                      {/* End Date */}
-                      <div className="flex items-center gap-1 flex-1 min-w-[120px]">
-                        <span className="text-xs text-slate-400 font-medium whitespace-nowrap">To</span>
-                        <input type="date" value={topPerfEndDate} onChange={e => setTopPerfEndDate(e.target.value)}
-                          className="text-xs border border-slate-200 bg-white rounded-xl px-2 py-2 outline-none focus:border-indigo-400 text-slate-700 w-full shadow-sm" />
+                      {/* Branch chips */}
+                      <div className="flex flex-wrap gap-1.5 items-center">
+                        <span className="text-xs text-slate-400 font-medium w-14">Branch:</span>
+                        {BRANCHES.map(b => (
+                          <button key={b} onClick={() => setTopPerfBranch(a => toggleArr(a, b))}
+                            className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${topPerfBranch.includes(b) ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"}`}>
+                            {b}
+                          </button>
+                        ))}
                       </div>
-                      {/* Reset */}
-                      {(topPerfStartDate || topPerfEndDate || topPerfLoanType !== "all" || topPerfBranch !== "all") && (
-                        <button onClick={() => { setTopPerfStartDate(""); setTopPerfEndDate(""); setTopPerfLoanType("all"); setTopPerfBranch("all"); }}
-                          className="text-xs text-slate-400 hover:text-red-500 px-2 py-2 rounded-xl hover:bg-red-50 transition-colors whitespace-nowrap">✕ Reset</button>
-                      )}
+                      {/* Product chips */}
+                      <div className="flex flex-wrap gap-1.5 items-center">
+                        <span className="text-xs text-slate-400 font-medium w-14">Product:</span>
+                        {LOAN_TYPES.map(t => (
+                          <button key={t} onClick={() => setTopPerfLoanType(a => toggleArr(a, t))}
+                            className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${topPerfLoanType.includes(t) ? "bg-purple-600 text-white border-purple-600" : "bg-white text-slate-600 border-slate-200 hover:border-purple-300"}`}>
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                      {/* Date + Reset */}
+                      <div className="flex flex-wrap gap-2 items-center">
+                        <span className="text-xs text-slate-400 font-medium w-14">Date:</span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-slate-400">From</span>
+                          <input type="date" value={topPerfStartDate} onChange={e => setTopPerfStartDate(e.target.value)}
+                            className="text-xs border border-slate-200 bg-white rounded-xl px-2 py-1.5 outline-none focus:border-indigo-400 text-slate-700 shadow-sm" />
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-slate-400">To</span>
+                          <input type="date" value={topPerfEndDate} onChange={e => setTopPerfEndDate(e.target.value)}
+                            className="text-xs border border-slate-200 bg-white rounded-xl px-2 py-1.5 outline-none focus:border-indigo-400 text-slate-700 shadow-sm" />
+                        </div>
+                        {(topPerfStartDate || topPerfEndDate || topPerfLoanType.length > 0 || topPerfBranch.length > 0 || topPerfFilter.length > 0) && (
+                          <button onClick={() => { setTopPerfStartDate(""); setTopPerfEndDate(""); setTopPerfLoanType([]); setTopPerfBranch([]); setTopPerfFilter([]); }}
+                            className="text-xs text-red-400 hover:text-red-600 px-2 py-1.5 rounded-xl hover:bg-red-50 transition-colors">✕ Reset all</button>
+                        )}
+                      </div>
+                    </div>
                     </div>
                   </div>
                   {(() => {
-                    // Group by BRANCH instead of RM
                     const branchesToShow = isAdmin ? BRANCHES : isBM ? (loggedInUser.branches || [loggedInUser.branch]) : [loggedInUser.branch];
                     const perfList = branchesToShow
-                      .filter(br => topPerfBranch === "all" || br === topPerfBranch)
+                      .filter(br => topPerfBranch.length === 0 || topPerfBranch.includes(br))
                       .map(br => {
-                        let brDeals = topPerfFilter === "all"
+                        let brDeals = topPerfFilter.length === 0
                           ? deals.filter(d => d.branch === br)
-                          : deals.filter(d => d.branch === br && d.status === topPerfFilter);
-                        if (topPerfLoanType !== "all") brDeals = brDeals.filter(d => d.loanType === topPerfLoanType);
+                          : deals.filter(d => d.branch === br && topPerfFilter.includes(d.status));
+                        if (topPerfLoanType.length > 0) brDeals = brDeals.filter(d => topPerfLoanType.includes(d.loanType));
                         if (topPerfStartDate) brDeals = brDeals.filter(d => d.date >= topPerfStartDate);
                         if (topPerfEndDate) brDeals = brDeals.filter(d => d.date <= topPerfEndDate);
                         const total = brDeals.reduce((s, d) => s + d.amount, 0);
@@ -909,10 +926,10 @@ export default function App() {
                       })
                       .sort((a, b) => b.filteredTotal - a.filteredTotal || b.filteredCount - a.filteredCount);
                     const maxVal = perfList[0]?.filteredTotal || 1;
-                    const filterLabel = { all:"Total (All Status)", Won:"Completed Drawdown", Pending:"Pipeline", "Pre-Approval":"Pre-Approval", Processing:"Processing", LOS:"LOS", LOO:"LOO", Rejected:"Rejected" }[topPerfFilter] || topPerfFilter;
+                    const filterLabel = topPerfFilter.length === 0 ? "All Status" : topPerfFilter.map(s => s === "Won" ? "Completed" : s).join(", ");
                     return perfList.map((br, i) => (
                       <div key={br.branch}
-                        onClick={() => setStatusFilterModal({ title: `Branch ${br.branch} — ${filterLabel}`, status: topPerfFilter === "all" ? "all" : topPerfFilter, branchFilter: br.branch })}
+                        onClick={() => setStatusFilterModal({ title: `Branch ${br.branch} — ${filterLabel}`, status: topPerfFilter.length === 0 ? "all" : topPerfFilter[0], branchFilter: br.branch })}
                         className="flex items-center px-5 py-4 border-b border-slate-50 last:border-0 hover:bg-indigo-50/40 transition-colors cursor-pointer">
                         <span className={`font-extrabold w-7 text-base flex-shrink-0 ${i === 0 ? "text-amber-400" : i === 1 ? "text-slate-400" : i === 2 ? "text-orange-400" : "text-slate-300"}`}>
                           {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i+1}`}
@@ -927,7 +944,7 @@ export default function App() {
                               <div className={`h-full rounded-full ${i === 0 ? "bg-amber-400" : i === 1 ? "bg-slate-400" : i === 2 ? "bg-orange-400" : "bg-indigo-300"}`}
                                 style={{ width: `${maxVal > 0 ? Math.round((br.filteredTotal/maxVal)*100) : 0}%`, transition:"width 0.8s ease" }}></div>
                             </div>
-                            <span className="text-xs text-slate-400 flex-shrink-0">{br.filteredCount} {filterLabel}</span>
+                            <span className="text-xs text-slate-400 flex-shrink-0">{br.filteredCount} deals</span>
                           </div>
                         </div>
                         <div className="text-right ml-4">
@@ -957,9 +974,9 @@ export default function App() {
                       <span className="text-xs bg-indigo-100 text-indigo-700 font-semibold px-2.5 py-1 rounded-full">
                         {(() => {
                           let d = selectedTeamRm ? visibleDeals.filter(x => x.rmUsername === selectedTeamRm) : visibleDeals;
-                          if (teamLoanType !== "all") d = d.filter(x => x.loanType === teamLoanType);
-                          if (teamLoanStatus !== "all") d = d.filter(x => x.status === teamLoanStatus);
-                          if (teamCustStatus !== "all") d = d.filter(x => x.customerStatus === teamCustStatus);
+                          if (teamLoanType.length > 0) d = d.filter(x => teamLoanType.includes(x.loanType));
+                          if (teamLoanStatus.length > 0) d = d.filter(x => teamLoanStatus.includes(x.status));
+                          if (teamCustStatus.length > 0) d = d.filter(x => teamCustStatus.includes(x.customerStatus));
                           if (teamStartDate) d = d.filter(x => x.date >= teamStartDate);
                           if (teamEndDate) d = d.filter(x => x.date <= teamEndDate);
                           return d.length;
@@ -975,9 +992,9 @@ export default function App() {
                       )}
                       <button onClick={() => {
                         let d = selectedTeamRm ? visibleDeals.filter(x => x.rmUsername === selectedTeamRm) : visibleDeals;
-                        if (teamLoanType !== "all") d = d.filter(x => x.loanType === teamLoanType);
-                        if (teamLoanStatus !== "all") d = d.filter(x => x.status === teamLoanStatus);
-                        if (teamCustStatus !== "all") d = d.filter(x => x.customerStatus === teamCustStatus);
+                        if (teamLoanType.length > 0) d = d.filter(x => teamLoanType.includes(x.loanType));
+                        if (teamLoanStatus.length > 0) d = d.filter(x => teamLoanStatus.includes(x.status));
+                        if (teamCustStatus.length > 0) d = d.filter(x => teamCustStatus.includes(x.customerStatus));
                         if (teamStartDate) d = d.filter(x => x.date >= teamStartDate);
                         if (teamEndDate) d = d.filter(x => x.date <= teamEndDate);
                         handleExportCustomers(d);
@@ -988,51 +1005,56 @@ export default function App() {
 
                     </div>
                   </div>
-                  {/* 5 Filters row */}
-                  <div className="flex flex-wrap gap-2 items-center">
-                    {/* Product Types */}
-                    <select value={teamLoanType} onChange={e => setTeamLoanType(e.target.value)}
-                      className="text-xs border border-slate-200 bg-white rounded-xl px-3 py-2 outline-none focus:border-indigo-400 text-slate-700 font-medium shadow-sm flex-1 min-w-[120px]">
-                      <option value="all">📦 All Products</option>
-                      {LOAN_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                    {/* Loan Status */}
-                    <select value={teamLoanStatus} onChange={e => setTeamLoanStatus(e.target.value)}
-                      className="text-xs border border-slate-200 bg-white rounded-xl px-3 py-2 outline-none focus:border-indigo-400 text-slate-700 font-medium shadow-sm flex-1 min-w-[120px]">
-                      <option value="all">📋 All Status</option>
-                      <option value="Pending">⏳ Pipeline</option>
-                      <option value="Pre-Approval">✅ Pre-Approval</option>
-                      <option value="Processing">🔄 Processing</option>
-                      <option value="LOS">📁 LOS</option>
-                      <option value="LOO">⭐ LOO</option>
-                      <option value="Won">🏦 Completed</option>
-                      <option value="Rejected">❌ Rejected</option>
-                    </select>
-                    {/* Customer Status */}
-                    <select value={teamCustStatus} onChange={e => setTeamCustStatus(e.target.value)}
-                      className="text-xs border border-slate-200 bg-white rounded-xl px-3 py-2 outline-none focus:border-indigo-400 text-slate-700 font-medium shadow-sm flex-1 min-w-[110px]">
-                      <option value="all">🎯 All Priority</option>
-                      <option value="High">🔴 High</option>
-                      <option value="Medium">🟡 Medium</option>
-                      <option value="Low">🟢 Low</option>
-                    </select>
-                    {/* Start Date */}
-                    <div className="flex items-center gap-1 flex-1 min-w-[110px]">
-                      <span className="text-xs text-slate-400 font-medium whitespace-nowrap">From</span>
-                      <input type="date" value={teamStartDate} onChange={e => setTeamStartDate(e.target.value)}
-                        className="text-xs border border-slate-200 bg-white rounded-xl px-2 py-2 outline-none focus:border-indigo-400 text-slate-700 w-full shadow-sm" />
+                  {/* Multi-select filter chips */}
+                  <div className="space-y-2">
+                    {/* Status chips */}
+                    <div className="flex flex-wrap gap-1.5 items-center">
+                      <span className="text-xs text-slate-400 font-medium w-14">Status:</span>
+                      {[["Pending","⏳ Pipeline"],["Pre-Approval","✅ Pre-Approval"],["Processing","🔄 Processing"],["LOS","📁 LOS"],["LOO","⭐ LOO"],["Won","🏦 Completed"],["Rejected","❌ Rejected"]].map(([val,label]) => (
+                        <button key={val} onClick={() => setTeamLoanStatus(a => toggleArr(a, val))}
+                          className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${teamLoanStatus.includes(val) ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"}`}>
+                          {label}
+                        </button>
+                      ))}
                     </div>
-                    {/* End Date */}
-                    <div className="flex items-center gap-1 flex-1 min-w-[110px]">
-                      <span className="text-xs text-slate-400 font-medium whitespace-nowrap">To</span>
-                      <input type="date" value={teamEndDate} onChange={e => setTeamEndDate(e.target.value)}
-                        className="text-xs border border-slate-200 bg-white rounded-xl px-2 py-2 outline-none focus:border-indigo-400 text-slate-700 w-full shadow-sm" />
+                    {/* Product chips */}
+                    <div className="flex flex-wrap gap-1.5 items-center">
+                      <span className="text-xs text-slate-400 font-medium w-14">Product:</span>
+                      {LOAN_TYPES.map(t => (
+                        <button key={t} onClick={() => setTeamLoanType(a => toggleArr(a, t))}
+                          className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${teamLoanType.includes(t) ? "bg-purple-600 text-white border-purple-600" : "bg-white text-slate-600 border-slate-200 hover:border-purple-300"}`}>
+                          {t}
+                        </button>
+                      ))}
                     </div>
-                    {/* Reset */}
-                    {(teamLoanType !== "all" || teamLoanStatus !== "all" || teamCustStatus !== "all" || teamStartDate || teamEndDate) && (
-                      <button onClick={() => { setTeamLoanType("all"); setTeamLoanStatus("all"); setTeamCustStatus("all"); setTeamStartDate(""); setTeamEndDate(""); }}
-                        className="text-xs text-red-400 hover:text-red-600 px-2 py-2 rounded-xl hover:bg-red-50 transition-colors whitespace-nowrap font-medium">✕ Reset</button>
-                    )}
+                    {/* Priority chips */}
+                    <div className="flex flex-wrap gap-1.5 items-center">
+                      <span className="text-xs text-slate-400 font-medium w-14">Priority:</span>
+                      {[["High","🔴 High"],["Medium","🟡 Medium"],["Low","🟢 Low"]].map(([val,label]) => (
+                        <button key={val} onClick={() => setTeamCustStatus(a => toggleArr(a, val))}
+                          className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${teamCustStatus.includes(val) ? "bg-amber-500 text-white border-amber-500" : "bg-white text-slate-600 border-slate-200 hover:border-amber-300"}`}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    {/* Date row */}
+                    <div className="flex flex-wrap gap-2 items-center">
+                      <span className="text-xs text-slate-400 font-medium w-14">Date:</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-slate-400">From</span>
+                        <input type="date" value={teamStartDate} onChange={e => setTeamStartDate(e.target.value)}
+                          className="text-xs border border-slate-200 bg-white rounded-xl px-2 py-1.5 outline-none focus:border-indigo-400 text-slate-700 shadow-sm" />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-slate-400">To</span>
+                        <input type="date" value={teamEndDate} onChange={e => setTeamEndDate(e.target.value)}
+                          className="text-xs border border-slate-200 bg-white rounded-xl px-2 py-1.5 outline-none focus:border-indigo-400 text-slate-700 shadow-sm" />
+                      </div>
+                      {(teamLoanType.length > 0 || teamLoanStatus.length > 0 || teamCustStatus.length > 0 || teamStartDate || teamEndDate) && (
+                        <button onClick={() => { setTeamLoanType([]); setTeamLoanStatus([]); setTeamCustStatus([]); setTeamStartDate(""); setTeamEndDate(""); }}
+                          className="text-xs text-red-400 hover:text-red-600 px-2 py-1.5 rounded-xl hover:bg-red-50 transition-colors font-medium">✕ Reset</button>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -1064,9 +1086,9 @@ export default function App() {
                 <div className="overflow-x-auto">
                   {(() => {
                     let teamDeals = selectedTeamRm ? visibleDeals.filter(d => d.rmUsername === selectedTeamRm) : visibleDeals;
-                    if (teamLoanType !== "all") teamDeals = teamDeals.filter(d => d.loanType === teamLoanType);
-                    if (teamLoanStatus !== "all") teamDeals = teamDeals.filter(d => d.status === teamLoanStatus);
-                    if (teamCustStatus !== "all") teamDeals = teamDeals.filter(d => d.customerStatus === teamCustStatus);
+                    if (teamLoanType.length > 0) teamDeals = teamDeals.filter(d => teamLoanType.includes(d.loanType));
+                    if (teamLoanStatus.length > 0) teamDeals = teamDeals.filter(d => teamLoanStatus.includes(d.status));
+                    if (teamCustStatus.length > 0) teamDeals = teamDeals.filter(d => teamCustStatus.includes(d.customerStatus));
                     if (teamStartDate) teamDeals = teamDeals.filter(d => d.date >= teamStartDate);
                     if (teamEndDate) teamDeals = teamDeals.filter(d => d.date <= teamEndDate);
                     if (!teamDeals.length) return (
@@ -1115,6 +1137,10 @@ export default function App() {
                                       <Edit2 size={12} /><span>Edit</span>
                                     </button>
                                   )}
+                                  <button onClick={() => { setViewingCustomer(deal); setIsViewCustomerModal(true); }}
+                                    className="flex items-center space-x-1 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-medium transition-colors">
+                                    <Eye size={12} /><span>View</span>
+                                  </button>
                                   {isAdmin && (
                                     <button onClick={() => handleDeleteDeal(deal.id, deal.client)}
                                       className="flex items-center space-x-1 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg text-xs font-medium transition-colors">
