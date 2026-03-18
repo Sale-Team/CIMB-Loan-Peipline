@@ -294,6 +294,7 @@ export default function App() {
   const [isViewCustomerModal, setIsViewCustomerModal] = useState(false);
   const [viewingCustomer, setViewingCustomer] = useState(null);
   const [isViewFollowUpModal, setIsViewFollowUpModal] = useState(false);
+  const [viewFollowUpDeal, setViewFollowUpDeal] = useState(null);
   const [viewingFollowUps, setViewingFollowUps] = useState([]);
   const [editingDeal, setEditingDeal] = useState(null); // deal being edited
   const [topPerfFilter, setTopPerfFilter] = useState([]);
@@ -1228,7 +1229,7 @@ export default function App() {
                                     {dealFollowUps.length} note{dealFollowUps.length !== 1 ? "s" : ""}
                                   </span>
                                   {dealFollowUps.length > 0 && (
-                                    <button onClick={() => setFollowUpFilter(p => ({ ...p, viewDealId: deal.id }))}
+                                    <button onClick={() => { setViewFollowUpDeal({ deal, followUps: dealFollowUps }); setIsViewFollowUpModal(true); }}
                                       className="px-2 py-1 bg-amber-50 text-amber-700 text-xs font-medium rounded-lg hover:bg-amber-100 transition-colors">
                                       👁 View
                                     </button>
@@ -2220,6 +2221,97 @@ export default function App() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW FOLLOW UP MODAL */}
+      {isViewFollowUpModal && viewFollowUpDeal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsViewFollowUpModal(false)}></div>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl relative z-10 flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="px-6 py-4 border-b bg-gradient-to-r from-amber-50 to-orange-50 flex justify-between items-center rounded-t-2xl">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800">👁 Follow-up Details</h3>
+                <p className="text-xs text-slate-500 mt-0.5">{viewFollowUpDeal.followUps.length} follow-up(s) recorded</p>
+              </div>
+              <button onClick={() => setIsViewFollowUpModal(false)}><X size={20} className="text-slate-400" /></button>
+            </div>
+
+            {/* Customer Info */}
+            <div className="px-6 pt-4">
+              <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4">
+                <p className="text-xs text-indigo-400 uppercase font-semibold tracking-wide mb-3">Customer Information</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-slate-400">Customer Name</p>
+                    <p className="font-bold text-slate-800">{viewFollowUpDeal.deal.client}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">RM Name</p>
+                    <p className="font-bold text-slate-700">{viewFollowUpDeal.deal.rmName || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">Branch</p>
+                    <p className="font-bold text-indigo-700">{viewFollowUpDeal.deal.branch || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">Product Type</p>
+                    <p className="font-bold text-slate-700">{viewFollowUpDeal.deal.loanType || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">Amount Request</p>
+                    <p className="font-bold text-emerald-700">{formatCurrency(viewFollowUpDeal.deal.amount)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">Rate</p>
+                    <p className="font-bold text-slate-700">{viewFollowUpDeal.deal.rate ? `${viewFollowUpDeal.deal.rate}%` : "—"}</p>
+                  </div>
+                  {viewFollowUpDeal.deal.existingBank && <>
+                    <div>
+                      <p className="text-xs text-slate-400">Existing Bank</p>
+                      <p className="font-bold text-slate-700">{viewFollowUpDeal.deal.existingBank}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Loan Outstanding</p>
+                      <p className="font-bold text-slate-700">{viewFollowUpDeal.deal.loanOutstanding ? formatCurrency(viewFollowUpDeal.deal.loanOutstanding) : "—"}</p>
+                    </div>
+                  </>}
+                </div>
+              </div>
+            </div>
+
+            {/* Follow Up History */}
+            <div className="px-6 py-4 overflow-y-auto flex-1">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">📝 Follow-up Notes</p>
+              <div className="space-y-3">
+                {viewFollowUpDeal.followUps.map((f, i) => (
+                  <div key={f.id} className="border border-slate-200 rounded-xl p-4 bg-slate-50">
+                    <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-500">#{i + 1}</span>
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${f.status === "High" ? "bg-red-50 text-red-600 border-red-200" : f.status === "Low" ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-amber-50 text-amber-600 border-amber-200"}`}>
+                          {f.status === "High" ? "🔴 High" : f.status === "Low" ? "🟢 Low" : "🟡 Medium"}
+                        </span>
+                        <span className="text-xs text-slate-400">📅 {new Date(f.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} → {new Date(f.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                      </div>
+                      <span className="text-xs text-slate-400">🔒 {new Date(f.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                    </div>
+                    <p className="text-sm text-slate-700 leading-relaxed">💬 {f.remark}</p>
+                    <p className="text-xs text-slate-400 mt-1.5">👤 {f.rmName}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t bg-slate-50 flex justify-between items-center">
+              <button onClick={() => { setIsViewFollowUpModal(false); setSelectedDealForFollowUp(viewFollowUpDeal.deal); setFollowUpForm({ startDate: "", endDate: "", remark: "", status: "Medium" }); setIsFollowUpModalOpen(true); }}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-xl">
+                <Plus size={14} /><span>Add Follow Up</span>
+              </button>
+              <button onClick={() => setIsViewFollowUpModal(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-200 rounded-xl">Close</button>
             </div>
           </div>
         </div>
