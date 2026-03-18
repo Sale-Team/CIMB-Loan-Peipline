@@ -298,6 +298,11 @@ export default function App() {
   const [topPerfLoanType, setTopPerfLoanType] = useState("all");
   const [isEditDealModalOpen, setIsEditDealModalOpen] = useState(false);
   const [editDealForm, setEditDealForm] = useState({});
+  const [followUps, setFollowUps] = useState([]);
+  const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
+  const [selectedDealForFollowUp, setSelectedDealForFollowUp] = useState(null);
+  const [followUpForm, setFollowUpForm] = useState({ startDate: "", endDate: "", remark: "" });
+  const [followUpFilter, setFollowUpFilter] = useState({ start: "", end: "" });
 
   const [newDeal, setNewDeal] = useState({
     client: "", businessName: "", phone: "", branch: loggedInUser?.branch || "NRD",
@@ -378,7 +383,14 @@ export default function App() {
       }
     });
 
-    return () => { unsubDeals(); unsubUsers(); };
+    const followUpsRef = collection(db, "artifacts", appId, "public", "data", "followUps");
+    const unsubFollowUps = onSnapshot(followUpsRef, snap => {
+      const f = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+      f.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setFollowUps(f);
+    });
+
+    return () => { unsubDeals(); unsubUsers(); unsubFollowUps(); };
   }, [firebaseUser]);
 
   // Visible deals based on role
@@ -614,6 +626,32 @@ export default function App() {
 
   const handleLogout = () => { setLoggedInUser(null); setActiveTab("dashboard"); };
 
+  const handleSaveFollowUp = async (e) => {
+    e.preventDefault();
+    if (!selectedDealForFollowUp || !followUpForm.startDate || !followUpForm.endDate || !followUpForm.remark.trim()) return;
+    try {
+      await addDoc(collection(db, "artifacts", appId, "public", "data", "followUps"), {
+        dealId: selectedDealForFollowUp.id,
+        client: selectedDealForFollowUp.client,
+        branch: selectedDealForFollowUp.branch,
+        amount: selectedDealForFollowUp.amount,
+        rate: selectedDealForFollowUp.rate,
+        date: selectedDealForFollowUp.date,
+        rmUsername: loggedInUser.username,
+        rmName: loggedInUser.name,
+        startDate: followUpForm.startDate,
+        endDate: followUpForm.endDate,
+        remark: followUpForm.remark.trim(),
+        createdAt: Date.now(),
+        locked: true,
+      });
+      setIsFollowUpModalOpen(false);
+      setFollowUpForm({ startDate: "", endDate: "", remark: "" });
+      setSelectedDealForFollowUp(null);
+      showToast(`✅ Follow-up saved for "${selectedDealForFollowUp.client}"!`);
+    } catch (err) { console.error(err); showToast("❌ Failed to save. Try again."); }
+  };
+
   // Upload RM photo — convert to base64 and save to Firestore
   const handlePhotoUpload = async (userId, file) => {
     if (!file) return;
@@ -634,7 +672,7 @@ export default function App() {
       {[
         { id: "dashboard", icon: <LayoutDashboard size={19} />, label: "Dashboard" },
         { id: "team", icon: <Users size={19} />, label: "Sale Performance" },
-        { id: "deals", icon: <Briefcase size={19} />, label: "Performance Sale Team" },
+        { id: "deals", icon: <Briefcase size={19} />, label: "Create Follow Up" },
         ...(isAdmin ? [{ id: "users", icon: <Shield size={19} />, label: "User Created", badge: "Admin" }] : []),
       ].map(item => (
         <button key={item.id} onClick={() => { setActiveTab(item.id); setIsMobileMenuOpen(false); }}
@@ -1085,59 +1123,154 @@ export default function App() {
             </div>
           )}
 
-          {/* DEALS */}
+          {/* CREATE FOLLOW UP TAB */}
           {activeTab === "deals" && (
-            <div className="max-w-7xl mx-auto bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-              <div className="p-6 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <h2 className="text-lg font-bold">{isAdmin ? "All Customers" : "My Customers"}</h2>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead><tr className="bg-slate-50 text-slate-500 text-xs uppercase border-b border-slate-200">
-                    <th className="p-4">Customer</th><th className="p-4">Branch</th><th className="p-4">Phone</th>
-                    <th className="p-4">Loan Type</th><th className="p-4">Amount</th><th className="p-4">Rate/Tenor</th>
-                    <th className="p-4">Income</th><th className="p-4">RM</th><th className="p-4">Date</th><th className="p-4">Status</th><th className="p-4">Action</th>
-                  </tr></thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredDeals.map(deal => (
-                      <tr key={deal.id} className="hover:bg-slate-50/50">
-                        <td className="p-4"><p className="font-semibold text-slate-800">{deal.client}</p>{deal.businessName && <p className="text-xs text-slate-400">{deal.businessName}</p>}</td>
-                        <td className="p-4"><span className="px-2 py-1 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-lg">{deal.branch || "—"}</span></td>
-                        <td className="p-4"><span className="text-sm text-slate-600">{deal.phone || "—"}</span></td>
-                        <td className="p-4"><span className="text-sm text-slate-600">{deal.loanType || "—"}</span></td>
-                        <td className="p-4"><span className="font-bold text-slate-700">{formatCurrency(deal.amount)}</span></td>
-                        <td className="p-4"><span className="text-sm text-slate-600">{deal.rate ? `${deal.rate}%` : "—"}{deal.tenor ? ` / ${deal.tenor}mo` : ""}</span></td>
-                        <td className="p-4"><span className={`px-2 py-1 rounded-full text-xs font-medium ${deal.incomeStatus === "Verified" ? "bg-emerald-50 text-emerald-700" : deal.incomeStatus === "Unverified" ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"}`}>{deal.incomeStatus || "—"}</span></td>
-                        <td className="p-4"><span className="text-sm font-medium text-slate-700">{deal.rmName || "—"}</span></td>
-                        <td className="p-4"><span className="text-xs text-slate-500">{new Date(deal.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span></td>
-                        <td className="p-4">
-                          <div className="flex items-center space-x-2">
-                            <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${statusBadge(deal.status)}`}>{deal.status === "Won" ? "Completed" : deal.status}</span>
-                            {deal.status === "Pending" && (
-                              <button onClick={() => handleDraftEmail(deal)} className="text-xs text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg">
-                                <Sparkles size={11} className="inline mr-1" />Draft
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                        <td className="p-4">
-                          <div className="flex items-center gap-2">
-                            <button onClick={() => openEditDeal(deal)}
-                              className="flex items-center space-x-1 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg text-xs font-medium transition-colors">
-                              <Edit2 size={12} /><span>Edit</span>
-                            </button>
-                            {isAdmin && (
-                              <button onClick={() => handleDeleteDeal(deal.id, deal.client)}
-                                className="flex items-center space-x-1 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg text-xs font-medium transition-colors">
-                                <Trash2 size={12} /><span>Del</span>
-                              </button>
-                            )}
-                          </div>
-                        </td>
+            <div className="max-w-7xl mx-auto space-y-6">
+
+              {/* Header + Filter */}
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                <div className="p-5 border-b bg-gradient-to-r from-slate-50 to-indigo-50/30">
+                  <div className="flex flex-wrap gap-3 items-center justify-between mb-4">
+                    <div>
+                      <h2 className="text-lg font-bold text-slate-800 flex items-center">
+                        <span className="w-1 h-5 bg-gradient-to-b from-indigo-500 to-blue-500 rounded-full mr-3 inline-block"></span>
+                        📋 Create Follow Up
+                      </h2>
+                      <p className="text-xs text-slate-400 mt-1 ml-4">Click on a customer to add a follow-up note</p>
+                    </div>
+                  </div>
+                  {/* Date filter for follow-up history */}
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <span className="text-xs text-slate-500 font-medium">🔍 Filter history:</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-slate-400 whitespace-nowrap">From</span>
+                      <input type="date" value={followUpFilter.start} onChange={e => setFollowUpFilter(p => ({ ...p, start: e.target.value }))}
+                        className="text-xs border border-slate-200 bg-white rounded-xl px-2 py-2 outline-none focus:border-indigo-400 text-slate-700 shadow-sm" />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-slate-400 whitespace-nowrap">To</span>
+                      <input type="date" value={followUpFilter.end} onChange={e => setFollowUpFilter(p => ({ ...p, end: e.target.value }))}
+                        className="text-xs border border-slate-200 bg-white rounded-xl px-2 py-2 outline-none focus:border-indigo-400 text-slate-700 shadow-sm" />
+                    </div>
+                    {(followUpFilter.start || followUpFilter.end) && (
+                      <button onClick={() => setFollowUpFilter({ start: "", end: "" })}
+                        className="text-xs text-red-400 hover:text-red-600 px-2 py-2 rounded-xl hover:bg-red-50 transition-colors whitespace-nowrap">✕ Reset</button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Customer list — click to add follow-up */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200">
+                        <th className="p-4">#</th>
+                        <th className="p-4">Customer</th>
+                        <th className="p-4">Branch</th>
+                        <th className="p-4">Amount</th>
+                        <th className="p-4">Rate</th>
+                        <th className="p-4">Date Created</th>
+                        <th className="p-4">Follow-ups</th>
+                        <th className="p-4">Action</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredDeals.map((deal, idx) => {
+                        const dealFollowUps = followUps.filter(f => f.dealId === deal.id);
+                        return (
+                          <tr key={deal.id} className="hover:bg-indigo-50/30 transition-colors">
+                            <td className="p-4 text-slate-400 text-sm">{idx + 1}</td>
+                            <td className="p-4">
+                              <p className="font-semibold text-slate-800">{deal.client}</p>
+                              {deal.businessName && <p className="text-xs text-slate-400">{deal.businessName}</p>}
+                              <p className="text-xs text-slate-400">{deal.rmName}</p>
+                            </td>
+                            <td className="p-4"><span className="px-2 py-1 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-lg">{deal.branch || "—"}</span></td>
+                            <td className="p-4"><span className="font-bold text-slate-700">{formatCurrency(deal.amount)}</span></td>
+                            <td className="p-4"><span className="text-sm text-slate-600">{deal.rate ? `${deal.rate}%` : "—"}</span></td>
+                            <td className="p-4"><span className="text-xs text-slate-500">{new Date(deal.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span></td>
+                            <td className="p-4">
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${dealFollowUps.length > 0 ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-400"}`}>
+                                {dealFollowUps.length} follow-up{dealFollowUps.length !== 1 ? "s" : ""}
+                              </span>
+                            </td>
+                            <td className="p-4">
+                              <button onClick={() => { setSelectedDealForFollowUp(deal); setFollowUpForm({ startDate: "", endDate: "", remark: "" }); setIsFollowUpModalOpen(true); }}
+                                className="flex items-center space-x-1 px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white rounded-lg text-xs font-medium transition-colors shadow-sm">
+                                <Plus size={12} /><span>Follow Up</span>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Follow-up History */}
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                <div className="p-5 border-b bg-gradient-to-r from-slate-50 to-amber-50/30">
+                  <h3 className="text-lg font-bold text-slate-800 flex items-center">
+                    <span className="w-1 h-5 bg-gradient-to-b from-amber-500 to-orange-500 rounded-full mr-3 inline-block"></span>
+                    📝 Follow-up History
+                    <span className="ml-3 text-xs bg-amber-100 text-amber-700 font-semibold px-2.5 py-1 rounded-full">
+                      {(() => {
+                        let f = isAdmin || isBM ? followUps : followUps.filter(f => f.rmUsername === loggedInUser.username);
+                        if (followUpFilter.start) f = f.filter(x => x.startDate >= followUpFilter.start);
+                        if (followUpFilter.end) f = f.filter(x => x.endDate <= followUpFilter.end);
+                        return f.length;
+                      })()} records
+                    </span>
+                  </h3>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {(() => {
+                    let filtered = isAdmin || isBM ? followUps : followUps.filter(f => f.rmUsername === loggedInUser.username);
+                    if (followUpFilter.start) filtered = filtered.filter(x => x.startDate >= followUpFilter.start);
+                    if (followUpFilter.end) filtered = filtered.filter(x => x.endDate <= followUpFilter.end);
+                    if (!filtered.length) return (
+                      <div className="py-16 text-center text-slate-400">
+                        <CheckCircle size={40} className="mx-auto mb-3 opacity-20" />
+                        <p className="font-medium">No follow-ups yet</p>
+                        <p className="text-xs mt-1">Click a customer above to add your first follow-up</p>
+                      </div>
+                    );
+                    return filtered.map((f, i) => (
+                      <div key={f.id} className="p-5 hover:bg-amber-50/20 transition-colors">
+                        <div className="flex flex-wrap gap-4 items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-2">
+                              <span className="font-bold text-slate-800">{f.client}</span>
+                              <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-lg">{f.branch}</span>
+                              <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-lg">{formatCurrency(f.amount)}</span>
+                              {f.rate && <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs font-semibold rounded-lg">{f.rate}%</span>}
+                              <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-xs rounded-lg">Created: {new Date(f.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                            </div>
+                            {/* Remark */}
+                            <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mt-2">
+                              <p className="text-sm text-slate-700 leading-relaxed">💬 {f.remark}</p>
+                            </div>
+                            {/* Follow up dates */}
+                            <div className="flex items-center gap-4 mt-2 flex-wrap">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs text-slate-400">📅 Follow-up:</span>
+                                <span className="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-lg">{new Date(f.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                                <span className="text-xs text-slate-400">→</span>
+                                <span className="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-lg">{new Date(f.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                              </div>
+                              <span className="text-xs text-slate-400">🔒 Locked</span>
+                            </div>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-xs font-semibold text-slate-600">👤 {f.rmName}</p>
+                            <p className="text-xs text-slate-400 mt-0.5">{new Date(f.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
               </div>
             </div>
           )}
@@ -1891,6 +2024,89 @@ export default function App() {
               <button onClick={() => copyToClipboard(emailDraft)} disabled={isAiLoading} className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white text-sm rounded-xl">
                 <Copy size={16} /><span>Copy</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FOLLOW UP MODAL */}
+      {isFollowUpModalOpen && selectedDealForFollowUp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsFollowUpModalOpen(false)}></div>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md relative z-10">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b bg-gradient-to-r from-indigo-50 to-blue-50 flex justify-between items-center rounded-t-2xl">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800">📋 Create Follow Up</h3>
+                <p className="text-xs text-slate-500 mt-0.5">🔒 Locked after save — cannot be edited</p>
+              </div>
+              <button onClick={() => setIsFollowUpModalOpen(false)}><X size={20} className="text-slate-400" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              {/* Customer Info — read only */}
+              <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 space-y-2">
+                <p className="text-xs text-indigo-400 uppercase font-semibold tracking-wide">Customer Info</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-slate-400">Customer Name</p>
+                    <p className="font-bold text-slate-800">{selectedDealForFollowUp.client}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">Branch</p>
+                    <p className="font-bold text-indigo-700">{selectedDealForFollowUp.branch}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">Request Amount</p>
+                    <p className="font-bold text-emerald-700">{formatCurrency(selectedDealForFollowUp.amount)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">Rate</p>
+                    <p className="font-bold text-slate-700">{selectedDealForFollowUp.rate ? `${selectedDealForFollowUp.rate}%` : "—"}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-xs text-slate-400">Date Created</p>
+                    <p className="font-bold text-slate-700">{new Date(selectedDealForFollowUp.date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Follow Up Form */}
+              <form onSubmit={handleSaveFollowUp} className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Start Date <span className="text-red-500">*</span></label>
+                    <input type="date" required value={followUpForm.startDate}
+                      onChange={e => setFollowUpForm(p => ({ ...p, startDate: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">End Date <span className="text-red-500">*</span></label>
+                    <input type="date" required value={followUpForm.endDate}
+                      min={followUpForm.startDate}
+                      onChange={e => setFollowUpForm(p => ({ ...p, endDate: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-sm" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Remark <span className="text-red-500">*</span></label>
+                  <textarea required rows={4} value={followUpForm.remark}
+                    onChange={e => setFollowUpForm(p => ({ ...p, remark: e.target.value }))}
+                    placeholder="Write your follow-up notes here... e.g. Customer confirmed interest, waiting for income documents..."
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-sm resize-none leading-relaxed" />
+                </div>
+                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-center gap-2">
+                  <Shield size={14} className="text-amber-600 flex-shrink-0" />
+                  <p className="text-xs text-amber-700">Once saved, this follow-up <strong>cannot be edited or deleted.</strong></p>
+                </div>
+                <div className="flex space-x-3 pt-1">
+                  <button type="button" onClick={() => setIsFollowUpModalOpen(false)}
+                    className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 text-sm font-medium">Cancel</button>
+                  <button type="submit"
+                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white rounded-xl text-sm font-semibold shadow-md">
+                    🔒 Save & Lock
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
