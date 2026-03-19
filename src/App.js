@@ -331,6 +331,10 @@ export default function App() {
   const [appUsers, setAppUsers] = useState([]);
   const [deals, setDeals] = useState([]);
   const [isAddDealModalOpen, setIsAddDealModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importPreview, setImportPreview] = useState([]);
+  const [importErrors, setImportErrors] = useState([]);
+  const [isImporting, setIsImporting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isPriorityModalOpen, setIsPriorityModalOpen] = useState(false);
@@ -404,6 +408,147 @@ export default function App() {
     const data = appUsers.map((u, i) => ({ ...u, no: i + 1, role: u.role === "admin" ? "Administrator" : u.role === "bm" ? "Branch Manager" : "Relationship Manager" }));
     exportToExcel(data, "Chip_Mong_Users", USER_HEADERS);
     showToast("✅ Users exported to Excel!");
+  };
+
+  // Download Excel template
+  const handleDownloadTemplate = () => {
+    const headers = [["Customer Name","Business/Workplace","Phone","Branch","Loan Type","Request Amount ($)","Approved Amount ($)","Rate (%)","Tenor (months)","Income Type","Income Amount ($)","Income Status","Customer Priority","Loan Status","Existing Bank","Loan Outstanding ($)","Existing Rate (%)","Maturity Date","RM Username"]];
+    const example = [["John Smith","Acme Corp","+855 12 345 678","NRD","Personal Loan","50000","45000","5.5","36","Salary","3000","Verified","Medium","Pending","ABA Bank","20000","7","2026-12-31","rm_username"]];
+    const csv = "\uFEFF" + [...headers, ...example].map(r => r.map(v => `"${v}"`).join(",")).join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], {type:"text/csv;charset=utf-8;"}));
+    a.download = "Customer_Import_Template.csv";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    showToast("✅ Template downloaded!");
+  };
+
+  // Parse Excel/CSV file
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target.result;
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      if (lines.length < 2) { setImportErrors(["File is empty or has no data rows."]); return; }
+
+      // Parse CSV properly
+      const parseRow = (line) => {
+        const result = [];
+        let cur = ""; let inQ = false;
+        for (let i = 0; i < line.length; i++) {
+          if (line[i] === '"') { inQ = !inQ; }
+          else if (line[i] === ',' && !inQ) { result.push(cur.trim()); cur = ""; }
+          else { cur += line[i]; }
+        }
+        result.push(cur.trim());
+        return result;
+      };
+
+      const headerRow = parseRow(lines[0]).map(h => h.replace(/"/g,"").toLowerCase().trim());
+      const rows = lines.slice(1);
+      const errors = [];
+      const preview = [];
+
+      const colMap = {
+        client:         ["customer name","name","client"],
+        businessName:   ["business","workplace","business/workplace"],
+        phone:          ["phone","telegram","phone / telegram"],
+        branch:         ["branch"],
+        loanType:       ["loan type","product","product type"],
+        amount:         ["request amount ($)","request amount","amount"],
+        approvedAmount: ["approved amount ($)","approved amount"],
+        rate:           ["rate (%)","rate"],
+        tenor:          ["tenor (months)","tenor"],
+        incomeType:     ["income type"],
+        incomeAmount:   ["income amount ($)","income amount"],
+        incomeStatus:   ["income status"],
+        customerStatus: ["customer priority","priority"],
+        status:         ["loan status","status"],
+        existingBank:   ["existing bank"],
+        loanOutstanding:["loan outstanding ($)","loan outstanding"],
+        existingRate:   ["existing rate (%)","existing rate"],
+        maturityDate:   ["maturity date"],
+        rmUsername:     ["rm username","rm"],
+      };
+
+      // Find column indexes
+      const getCol = (keys) => { for (const k of keys) { const i = headerRow.findIndex(h => h.includes(k)); if (i !== -1) return i; } return -1; };
+      const idx = {};
+      for (const [field, keys] of Object.entries(colMap)) idx[field] = getCol(keys);
+
+      rows.forEach((line, rowNum) => {
+        if (!line.trim()) return;
+        const cols = parseRow(line).map(c => c.replace(/^"|"$/g, "").trim());
+        const get = (field) => idx[field] !== -1 ? (cols[idx[field]] || "") : "";
+
+        const client = get("client");
+        const branch = get("branch");
+        const amount = parseFloat(get("amount")) || 0;
+        const rowErrors = [];
+
+        if (!client) rowErrors.push(`Row ${rowNum+2}: Customer Name is required`);
+        if (!branch) rowErrors.push(`Row ${rowNum+2}: Branch is required`);
+        if (!amount) rowErrors.push(`Row ${rowNum+2}: Amount must be a number`);
+        if (branch && !BRANCHES.includes(branch)) rowErrors.push(`Row ${rowNum+2}: Invalid branch "${branch}"`);
+
+        if (rowErrors.length) { errors.push(...rowErrors); return; }
+
+        // Find RM
+        const rmUsername = get("rmUsername");
+        const rmUser = appUsers.find(u => u.username === rmUsername);
+
+        preview.push({
+          client,
+          businessName: get("businessName"),
+          phone: get("phone"),
+          branch,
+          loanType: get("loanType") || "Personal Loan",
+          amount,
+          approvedAmount: parseFloat(get("approvedAmount")) || 0,
+          rate: parseFloat(get("rate")) || 0,
+          tenor: parseInt(get("tenor")) || 0,
+          incomeType: get("incomeType") || "Salary",
+          incomeAmount: parseFloat(get("incomeAmount")) || 0,
+          incomeStatus: get("incomeStatus") || "Pending",
+          customerStatus: get("customerStatus") || "Medium",
+          status: get("status") || "Pending",
+          existingBank: get("existingBank"),
+          loanOutstanding: parseFloat(get("loanOutstanding")) || 0,
+          existingRate: parseFloat(get("existingRate")) || 0,
+          maturityDate: get("maturityDate"),
+          rmUsername: rmUser?.username || loggedInUser.username,
+          rmName: rmUser?.name || loggedInUser.name,
+          date: new Date().toISOString().split("T")[0],
+          createdAt: Date.now(),
+        });
+      });
+
+      setImportErrors(errors);
+      setImportPreview(preview);
+    };
+    reader.readAsText(file, "UTF-8");
+    e.target.value = "";
+  };
+
+  // Save imported customers to Firebase
+  const handleImportSave = async () => {
+    if (!importPreview.length) return;
+    setIsImporting(true);
+    try {
+      const dealsRef = collection(db, "artifacts", appId, "public", "data", "deals");
+      for (const deal of importPreview) {
+        await addDoc(dealsRef, deal);
+      }
+      showToast(`✅ ${importPreview.length} customers imported successfully!`);
+      setIsImportModalOpen(false);
+      setImportPreview([]);
+      setImportErrors([]);
+    } catch (err) {
+      console.error(err);
+      showToast("❌ Import failed. Please try again.");
+    }
+    setIsImporting(false);
   };
 
   // 🔐 Session timeout — auto logout after 60 min inactivity
@@ -1173,6 +1318,12 @@ export default function App() {
                         <button onClick={() => setIsAddDealModalOpen(true)}
                           className="flex items-center space-x-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white px-4 py-2 rounded-xl text-sm font-medium shadow-sm transition-all hover:shadow-md">
                           <Plus size={16} /><span>New Customer</span>
+                        </button>
+                      )}
+                      {isAdmin && (
+                        <button onClick={() => { setImportPreview([]); setImportErrors([]); setIsImportModalOpen(true); }}
+                          className="flex items-center space-x-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white px-4 py-2 rounded-xl text-sm font-medium shadow-sm transition-all hover:shadow-md">
+                          <Upload size={16} /><span>📥 Import Excel</span>
                         </button>
                       )}
                       <button onClick={() => {
@@ -2460,6 +2611,130 @@ export default function App() {
                 <Plus size={14} /><span>Add Follow Up</span>
               </button>
               <button onClick={() => setIsViewFollowUpModal(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-200 rounded-xl">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* IMPORT EXCEL MODAL */}
+      {isImportModalOpen && isAdmin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !isImporting && setIsImportModalOpen(false)}></div>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl relative z-10 flex flex-col max-h-[92vh]">
+
+            {/* Header */}
+            <div className="px-6 py-4 border-b bg-gradient-to-r from-amber-50 to-orange-50 flex justify-between items-center rounded-t-2xl">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800">📥 Import Customers from Excel</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Upload CSV/Excel file — preview before saving</p>
+              </div>
+              <button onClick={() => setIsImportModalOpen(false)} disabled={isImporting}><X size={20} className="text-slate-400" /></button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1 space-y-5">
+
+              {/* Step 1: Download template */}
+              <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex items-center justify-between gap-4">
+                <div>
+                  <p className="font-semibold text-indigo-800 text-sm">Step 1: Download Template</p>
+                  <p className="text-xs text-indigo-600 mt-0.5">Download the template, fill in your customers, then upload below.</p>
+                </div>
+                <button onClick={handleDownloadTemplate}
+                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-xl flex-shrink-0">
+                  <FileDown size={16} /><span>Download Template</span>
+                </button>
+              </div>
+
+              {/* Step 2: Upload file */}
+              <div className="border-2 border-dashed border-slate-200 hover:border-amber-400 rounded-xl p-8 text-center transition-colors">
+                <Upload size={36} className="mx-auto mb-3 text-slate-300" />
+                <p className="font-semibold text-slate-600 mb-1">Step 2: Upload your file</p>
+                <p className="text-xs text-slate-400 mb-4">Supports .CSV files (Excel → Save As → CSV)</p>
+                <label className="cursor-pointer inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold rounded-xl transition-colors">
+                  <Upload size={16} /><span>Choose File</span>
+                  <input type="file" accept=".csv,.txt" className="hidden" onChange={handleFileUpload} />
+                </label>
+              </div>
+
+              {/* Errors */}
+              {importErrors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                  <p className="font-semibold text-red-700 text-sm mb-2">⚠️ {importErrors.length} error(s) found — fix in file and re-upload:</p>
+                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                    {importErrors.map((e, i) => <p key={i} className="text-xs text-red-600">• {e}</p>)}
+                  </div>
+                </div>
+              )}
+
+              {/* Preview table */}
+              {importPreview.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="font-semibold text-slate-800">
+                      ✅ Step 3: Preview — <span className="text-emerald-600">{importPreview.length} customers ready to import</span>
+                    </p>
+                    <span className="text-xs text-slate-400">Scroll to review all rows</span>
+                  </div>
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="overflow-x-auto max-h-72">
+                      <table className="w-full text-left text-xs">
+                        <thead className="sticky top-0">
+                          <tr className="bg-slate-100 text-slate-600 uppercase tracking-wide">
+                            <th className="px-3 py-2">#</th>
+                            <th className="px-3 py-2">Customer</th>
+                            <th className="px-3 py-2">Branch</th>
+                            <th className="px-3 py-2">Product</th>
+                            <th className="px-3 py-2">Amount</th>
+                            <th className="px-3 py-2">Rate</th>
+                            <th className="px-3 py-2">Status</th>
+                            <th className="px-3 py-2">Priority</th>
+                            <th className="px-3 py-2">RM</th>
+                            <th className="px-3 py-2">Existing Bank</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {importPreview.map((row, i) => (
+                            <tr key={i} className="hover:bg-amber-50/30">
+                              <td className="px-3 py-2 text-slate-400">{i+1}</td>
+                              <td className="px-3 py-2 font-semibold text-slate-800">
+                                {row.client}
+                                {row.businessName && <div className="text-slate-400 font-normal">{row.businessName}</div>}
+                              </td>
+                              <td className="px-3 py-2"><span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 font-bold rounded">{row.branch}</span></td>
+                              <td className="px-3 py-2 text-slate-600">{row.loanType}</td>
+                              <td className="px-3 py-2 font-bold text-slate-700">{formatCurrency(row.amount)}</td>
+                              <td className="px-3 py-2">{row.rate ? `${row.rate}%` : "—"}</td>
+                              <td className="px-3 py-2"><span className={`px-1.5 py-0.5 rounded text-xs font-medium ${statusBadge(row.status)}`}>{row.status}</span></td>
+                              <td className="px-3 py-2">
+                                <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${row.customerStatus==="High"?"bg-red-100 text-red-600":row.customerStatus==="Low"?"bg-emerald-100 text-emerald-600":"bg-amber-100 text-amber-600"}`}>
+                                  {row.customerStatus}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-slate-600">{row.rmName}</td>
+                              <td className="px-3 py-2 text-slate-500">{row.existingBank || "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer buttons */}
+            <div className="px-6 py-4 border-t bg-slate-50 rounded-b-2xl flex items-center justify-between gap-3">
+              <button onClick={() => { setIsImportModalOpen(false); setImportPreview([]); setImportErrors([]); }} disabled={isImporting}
+                className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-100 text-sm font-medium">
+                Cancel
+              </button>
+              {importPreview.length > 0 && (
+                <button onClick={handleImportSave} disabled={isImporting}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 disabled:opacity-60 text-white text-sm font-bold rounded-xl shadow-md transition-all">
+                  {isImporting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+                  {isImporting ? "Importing..." : `✅ Import ${importPreview.length} Customers`}
+                </button>
+              )}
             </div>
           </div>
         </div>
