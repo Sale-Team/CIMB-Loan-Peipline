@@ -205,104 +205,226 @@ function LoginPage({ onLogin }) {
   };
 
   return (
-    <div className="min-h-screen flex" style={{background:"#f5f5f5"}}>
+    <div className="min-h-screen flex" style={{background:"#0d0d0d"}}>
 
-      {/* LEFT PANEL — CIMB Red with car illustration like real website */}
-      <div className="hidden lg:flex flex-col justify-between w-1/2 relative overflow-hidden" style={{background:"linear-gradient(160deg, #8B0000 0%, #C8102E 45%, #E31837 100%)"}}>
-        {/* Top nav bar like CIMB website */}
-        <div className="px-10 pt-8 flex items-center gap-3 relative z-10">
-          <svg width="44" height="44" viewBox="0 0 80 80" fill="none">
-            <polygon points="40,2 78,40 40,78 2,40" fill="white" fillOpacity="0.95"/>
-            <polygon points="40,13 67,40 40,67 13,40" fill="#C8102E"/>
-            <text x="40" y="36" textAnchor="middle" fill="white" fontSize="13" fontWeight="900" fontFamily="Arial,sans-serif">CIMB</text>
-            <text x="40" y="51" textAnchor="middle" fill="white" fontSize="8" fontWeight="700" fontFamily="Arial,sans-serif">BANK</text>
-          </svg>
-          <div>
-            <p className="text-white font-bold text-lg leading-tight">CIMB Bank</p>
-            <p className="text-red-200 text-xs">Cambodia</p>
-          </div>
-        </div>
+      {/* LEFT PANEL — CIMB Red */}
+      <div className="hidden lg:flex flex-col justify-between w-1/2 relative overflow-hidden" style={{background:"linear-gradient(155deg, #5a0000 0%, #8B0010 30%, #C8102E 65%, #E31837 100%)"}}>
 
-        {/* Main content area */}
-        <div className="flex-1 flex flex-col justify-center px-10 pb-8 relative z-10">
-          <div className="mb-6">
-            <p className="text-red-200 text-sm font-semibold uppercase tracking-widest mb-2">Loan Pipeline</p>
-            <h2 className="text-white text-4xl font-bold leading-tight">Internal Banking<br/>Management Portal</h2>
-            <p className="text-red-200 mt-3 text-sm leading-relaxed">Empowering your team with real-time<br/>loan tracking and performance insights.</p>
-          </div>
-
-          {/* Car SVG illustration — clean like CIMB website */}
-          <div className="relative mt-4">
-            <svg viewBox="0 0 500 220" xmlns="http://www.w3.org/2000/svg" className="w-full max-w-md">
-              {/* Road */}
-              <rect x="0" y="170" width="500" height="50" fill="rgba(0,0,0,0.2)" rx="4"/>
-              <rect x="0" y="170" width="500" height="4" fill="rgba(255,255,255,0.15)"/>
-              {/* Road dashes */}
-              <rect x="40" y="194" width="40" height="4" fill="rgba(255,255,255,0.3)" rx="2"/>
-              <rect x="130" y="194" width="40" height="4" fill="rgba(255,255,255,0.3)" rx="2"/>
-              <rect x="220" y="194" width="40" height="4" fill="rgba(255,255,255,0.3)" rx="2"/>
-              <rect x="310" y="194" width="40" height="4" fill="rgba(255,255,255,0.3)" rx="2"/>
-              <rect x="400" y="194" width="40" height="4" fill="rgba(255,255,255,0.3)" rx="2"/>
-              {/* Car body */}
-              <rect x="80" y="120" width="340" height="60" fill="white" rx="10"/>
-              {/* Car roof */}
-              <path d="M150 120 C160 85, 200 70, 250 68 C300 68, 330 82, 345 120 Z" fill="white"/>
-              {/* Windshield */}
-              <path d="M165 118 C170 92, 205 78, 248 76 C290 76, 318 90, 330 118 Z" fill="rgba(144,198,230,0.6)"/>
-              {/* Side windows */}
-              <rect x="160" y="95" width="60" height="24" fill="rgba(144,198,230,0.5)" rx="4"/>
-              <rect x="228" y="95" width="60" height="24" fill="rgba(144,198,230,0.5)" rx="4"/>
-              {/* Door lines */}
-              <line x1="225" y1="120" x2="225" y2="178" stroke="rgba(200,16,46,0.3)" strokeWidth="2"/>
-              <line x1="295" y1="120" x2="295" y2="178" stroke="rgba(200,16,46,0.3)" strokeWidth="2"/>
-              {/* CIMB logo on car */}
-              <rect x="200" y="138" width="100" height="22" fill="#C8102E" rx="4"/>
-              <text x="250" y="153" textAnchor="middle" fill="white" fontSize="10" fontWeight="900" fontFamily="Arial,sans-serif">CIMB BANK</text>
-              {/* Headlights */}
-              <ellipse cx="98" cy="152" rx="12" ry="8" fill="rgba(255,220,100,0.9)"/>
-              <ellipse cx="98" cy="152" rx="6" ry="4" fill="white"/>
-              <ellipse cx="402" cy="152" rx="12" ry="8" fill="rgba(255,100,100,0.8)"/>
-              {/* Wheels */}
-              <circle cx="155" cy="178" r="22" fill="#222"/>
-              <circle cx="155" cy="178" r="13" fill="#555"/>
-              <circle cx="155" cy="178" r="5" fill="#C8102E"/>
-              <circle cx="345" cy="178" r="22" fill="#222"/>
-              <circle cx="345" cy="178" r="13" fill="#555"/>
-              <circle cx="345" cy="178" r="5" fill="#C8102E"/>
-              {/* Speed lines */}
-              <line x1="30" y1="140" x2="75" y2="140" stroke="rgba(255,255,255,0.2)" strokeWidth="2" strokeDasharray="5,4"/>
-              <line x1="20" y1="152" x2="70" y2="152" stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" strokeDasharray="4,4"/>
-              <line x1="30" y1="163" x2="72" y2="163" stroke="rgba(255,255,255,0.1)" strokeWidth="1" strokeDasharray="4,4"/>
+        {/* REAL CIMB LOGO — Top Left */}
+        <div className="px-10 pt-8 flex items-center gap-4 relative z-10">
+          {/* Accurate CIMB logo: red background + white "CIMB" bold text + curved underline */}
+          <div className="flex items-center gap-1">
+            <svg width="120" height="42" viewBox="0 0 200 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+              {/* Red rectangle background */}
+              <rect width="200" height="70" rx="4" fill="#C8102E"/>
+              {/* White CIMB bold text */}
+              <text x="100" y="40" textAnchor="middle" fill="white" fontSize="34" fontWeight="900" fontFamily="Arial Black,Impact,sans-serif" letterSpacing="3">CIMB</text>
+              {/* Curved swoosh line below — signature CIMB element */}
+              <path d="M 30 52 Q 100 62 170 52" stroke="white" strokeWidth="3" fill="none" strokeLinecap="round"/>
             </svg>
           </div>
+          <div className="border-l border-white/30 pl-4">
+            <p className="text-white font-bold text-sm leading-tight">Loan Pipeline</p>
+            <p className="text-red-200 text-xs tracking-widest uppercase">Internal System</p>
+          </div>
         </div>
 
-        {/* Bottom tagline */}
-        <div className="px-10 pb-8 relative z-10">
-          <p className="text-red-200 text-xs">© {new Date().getFullYear()} CIMB Bank PLC. All rights reserved.</p>
+        {/* Main text */}
+        <div className="flex-1 flex flex-col justify-center px-10 relative z-10 mt-4">
+          <p className="text-red-300 text-xs font-bold uppercase tracking-widest mb-3">● Banking Management</p>
+          <h2 className="text-white text-3xl font-black leading-snug mb-4">Internal Banking<br/><span style={{color:"#FFD700"}}>Management</span><br/>Portal</h2>
+          <p className="text-red-200 text-sm leading-relaxed max-w-xs">Real-time loan tracking, team performance, and customer pipeline — all in one place.</p>
+          <div className="flex gap-3 mt-5">
+            <div className="bg-white/10 border border-white/20 rounded-xl px-4 py-2 text-center">
+              <p className="text-white font-black text-lg">15+</p>
+              <p className="text-red-200 text-xs">Branches</p>
+            </div>
+            <div className="bg-white/10 border border-white/20 rounded-xl px-4 py-2 text-center">
+              <p className="text-white font-black text-lg">3</p>
+              <p className="text-red-200 text-xs">Roles</p>
+            </div>
+            <div className="bg-white/10 border border-white/20 rounded-xl px-4 py-2 text-center">
+              <p className="text-white font-black text-lg">Live</p>
+              <p className="text-red-200 text-xs">Real-time</p>
+            </div>
+          </div>
         </div>
 
-        {/* Background decorative elements */}
-        <div className="absolute top-0 right-0 w-72 h-72 rounded-full opacity-10" style={{background:"radial-gradient(circle, #ffffff, transparent)", transform:"translate(30%, -30%)"}}></div>
-        <div className="absolute bottom-0 left-0 w-56 h-56 rounded-full opacity-10" style={{background:"radial-gradient(circle, #ffffff, transparent)", transform:"translate(-20%, 20%)"}}></div>
-        <div className="absolute top-1/2 right-8 w-32 h-32 rounded-full opacity-5" style={{background:"radial-gradient(circle, #ffffff, transparent)"}}></div>
+        {/* LUXURY CAR — Premium Mercedes/BMW style sedan */}
+        <div className="relative px-4 pb-2 z-10">
+          <svg viewBox="0 0 580 210" xmlns="http://www.w3.org/2000/svg" className="w-full drop-shadow-2xl">
+            {/* Ground shadow */}
+            <ellipse cx="290" cy="197" rx="220" ry="10" fill="rgba(0,0,0,0.5)"/>
+            {/* Road */}
+            <rect x="0" y="183" width="580" height="27" fill="rgba(0,0,0,0.3)" rx="2"/>
+            {/* Road markings */}
+            {[20,110,200,290,380,470].map((x,i) => <rect key={i} x={x} y="193" width="50" height="3" fill="rgba(255,255,255,0.15)" rx="1"/>)}
+
+            {/* ── CAR BODY ── */}
+            {/* Main body — pearl white */}
+            <path d="M58 150 Q62 136 78 134 L502 134 Q518 136 522 150 L522 180 Q516 183 502 183 L78 183 Q62 183 58 180 Z" fill="#F2F2F0"/>
+            {/* Body upper highlight */}
+            <path d="M65 148 Q68 138 82 136 L498 136 Q512 138 515 148 L515 154 Q495 150 280 150 Q65 150 65 148 Z" fill="white" opacity="0.7"/>
+            {/* Lower chrome trim */}
+            <rect x="72" y="176" width="436" height="4" rx="2" fill="url(#chrome)"/>
+            <defs>
+              <linearGradient id="chrome" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#e8e8e8"/>
+                <stop offset="50%" stopColor="white"/>
+                <stop offset="100%" stopColor="#aaa"/>
+              </linearGradient>
+              <linearGradient id="glass" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="rgba(160,220,245,0.7)"/>
+                <stop offset="100%" stopColor="rgba(100,180,220,0.4)"/>
+              </linearGradient>
+            </defs>
+            {/* Side body crease line */}
+            <path d="M78 160 Q200 155 290 155 Q380 155 502 160" stroke="rgba(180,180,180,0.5)" strokeWidth="1.5" fill="none"/>
+
+            {/* ── ROOFLINE — Sleek coupe-style ── */}
+            <path d="M135 134 C142 96 182 66 220 56 L360 52 C400 54 438 74 452 102 L468 134 Z" fill="#EDEDED"/>
+            <path d="M142 130 C148 96 184 70 222 62 L358 58 C396 60 432 78 448 105 L460 130 Z" fill="white" opacity="0.55"/>
+            {/* Roof dark panel */}
+            <path d="M172 128 C176 108 195 90 222 84 L358 80 C385 84 405 102 415 122 L424 128 Z" fill="#DADADD"/>
+
+            {/* ── WINDSHIELDS ── */}
+            {/* Front windshield */}
+            <path d="M172 128 C176 108 195 90 222 84 L270 80 L270 128 Z" fill="url(#glass)" opacity="0.85"/>
+            {/* Rear windshield */}
+            <path d="M350 80 L388 84 C406 98 415 118 420 128 L350 128 Z" fill="url(#glass)" opacity="0.75"/>
+
+            {/* ── SIDE WINDOWS ── */}
+            <path d="M175 92 L243 88 L243 130 L175 130 Z" fill="url(#glass)" rx="4" opacity="0.9"/>
+            <rect x="252" y="82" width="88" height="48" rx="5" fill="url(#glass)" opacity="0.9"/>
+            <rect x="348" y="88" width="58" height="42" rx="4" fill="url(#glass)" opacity="0.8"/>
+            {/* Window frames */}
+            <path d="M175 92 L243 88 L243 130 L175 130 Z" fill="none" stroke="#bbb" strokeWidth="1.5"/>
+            <rect x="252" y="82" width="88" height="48" rx="5" fill="none" stroke="#bbb" strokeWidth="1.5"/>
+            <rect x="348" y="88" width="58" height="42" rx="4" fill="none" stroke="#bbb" strokeWidth="1.5"/>
+
+            {/* ── DOOR LINES ── */}
+            <line x1="248" y1="134" x2="248" y2="178" stroke="#ccc" strokeWidth="1.5"/>
+            <line x1="344" y1="134" x2="344" y2="178" stroke="#ccc" strokeWidth="1.5"/>
+            <line x1="414" y1="134" x2="414" y2="178" stroke="#ccc" strokeWidth="1.5"/>
+            {/* Door handles — slim touch handles */}
+            <rect x="195" y="157" width="26" height="5" rx="2.5" fill="#bbb"/>
+            <rect x="285" y="157" width="26" height="5" rx="2.5" fill="#bbb"/>
+            <rect x="365" y="157" width="26" height="5" rx="2.5" fill="#bbb"/>
+
+            {/* ── FRONT END ── */}
+            <path d="M58 150 L78 134 L125 134 L112 150 Z" fill="#E8E8E8"/>
+            <path d="M52 156 Q52 178 74 181 L120 181 L124 156 Z" fill="#DCDCDC"/>
+            {/* Front grille — luxury kidney shape */}
+            <rect x="60" y="153" width="50" height="22" rx="6" fill="#111"/>
+            {/* Grille bars */}
+            {[156,161,166,171].map((y,i) => <rect key={i} x="63" y={y} width="44" height="2" rx="1" fill="#2a2a2a"/>)}
+            {/* Grille chrome surround */}
+            <rect x="59" y="152" width="52" height="24" rx="7" fill="none" stroke="rgba(200,200,200,0.8)" strokeWidth="2"/>
+            {/* Hood star/emblem */}
+            <circle cx="95" cy="134" r="5" fill="silver"/>
+            <circle cx="95" cy="134" r="3" fill="#C8102E"/>
+            {/* Front headlight — ultra slim LED */}
+            <path d="M60 140 L122 138 L125 146 L62 147 Z" fill="#111"/>
+            <path d="M63 141 L120 139 L122 144 L64 145 Z" fill="rgba(255,248,200,0.95)"/>
+            <rect x="63" y="141" width="58" height="2" rx="1" fill="white" opacity="0.9"/>
+            {/* DRL */}
+            <path d="M64 145 L121 143" stroke="rgba(255,220,80,0.7)" strokeWidth="1.5" strokeLinecap="round"/>
+            {/* Front fog */}
+            <ellipse cx="82" cy="176" rx="11" ry="4" fill="rgba(255,245,160,0.6)"/>
+            {/* Hood crease */}
+            <path d="M78 134 Q110 125 135 122" stroke="rgba(200,200,200,0.4)" strokeWidth="1" fill="none"/>
+
+            {/* ── REAR END ── */}
+            <path d="M522 150 L502 134 L455 134 L468 150 Z" fill="#E8E8E8"/>
+            <path d="M528 156 Q528 178 506 181 L460 181 L456 156 Z" fill="#DCDCDC"/>
+            {/* Rear lights — full-width LED bar like modern luxury */}
+            <path d="M454 138 L524 138 L526 148 L454 148 Z" fill="#111"/>
+            <path d="M456 139 L522 139 L523 146 L456 146 Z" fill="rgba(220,40,40,0.9)"/>
+            <rect x="456" y="139" width="66" height="2" rx="1" fill="rgba(255,80,80,0.95)"/>
+            {/* LED connecting bar top */}
+            <rect x="136" y="52" width="288" height="3" rx="1.5" fill="rgba(220,40,40,0.3)"/>
+            {/* Exhaust pipes — dual quad */}
+            <ellipse cx="462" cy="179" rx="9" ry="4" fill="#444"/>
+            <ellipse cx="462" cy="179" rx="6" ry="2.5" fill="#1a1a1a"/>
+            <ellipse cx="477" cy="179" rx="9" ry="4" fill="#444"/>
+            <ellipse cx="477" cy="179" rx="6" ry="2.5" fill="#1a1a1a"/>
+            {/* Trunk crease */}
+            <path d="M502 134 Q460 126 440 122" stroke="rgba(200,200,200,0.4)" strokeWidth="1" fill="none"/>
+
+            {/* CIMB badge */}
+            <rect x="238" y="153" width="104" height="18" rx="4" fill="#C8102E"/>
+            <rect x="239" y="154" width="102" height="16" rx="3" fill="none" stroke="rgba(255,200,0,0.5)" strokeWidth="1"/>
+            <text x="290" y="165" textAnchor="middle" fill="white" fontSize="8.5" fontWeight="900" fontFamily="Arial Black,sans-serif" letterSpacing="2">CIMB BANK</text>
+
+            {/* ── WHEELS — 5-spoke luxury alloy ── */}
+            {[160, 420].map((cx,i) => (
+              <g key={i}>
+                <circle cx={cx} cy="183" r="28" fill="#0d0d0d"/>
+                <circle cx={cx} cy="183" r="23" fill="#1e1e1e"/>
+                {/* 5 spokes */}
+                {[0,72,144,216,288].map((deg,j) => {
+                  const rad = (deg-90) * Math.PI/180;
+                  return <line key={j} x1={cx} y1={183} x2={cx + 21*Math.cos(rad)} y2={183 + 21*Math.sin(rad)} stroke="url(#spokeGrad)" strokeWidth="5" strokeLinecap="round"/>
+                })}
+                <defs>
+                  <linearGradient id="spokeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#888"/>
+                    <stop offset="50%" stopColor="silver"/>
+                    <stop offset="100%" stopColor="#666"/>
+                  </linearGradient>
+                </defs>
+                {/* Between-spoke dark */}
+                <circle cx={cx} cy="183" r="9" fill="#333"/>
+                <circle cx={cx} cy="183" r="6" fill="#C8102E"/>
+                <circle cx={cx} cy="183" r="3" fill="silver"/>
+                {/* Outer tire */}
+                <circle cx={cx} cy="183" r="28" fill="none" stroke="#080808" strokeWidth="5"/>
+              </g>
+            ))}
+
+            {/* Speed lines */}
+            <line x1="0" y1="128" x2="50" y2="128" stroke="rgba(255,255,255,0.15)" strokeWidth="2" strokeDasharray="8,5"/>
+            <line x1="0" y1="142" x2="45" y2="142" stroke="rgba(255,255,255,0.1)" strokeWidth="1.5" strokeDasharray="6,6"/>
+            <line x1="0" y1="155" x2="42" y2="155" stroke="rgba(255,255,255,0.07)" strokeWidth="1" strokeDasharray="5,6"/>
+          </svg>
+        </div>
+
+        {/* Bottom */}
+        <div className="px-10 pb-5 relative z-10">
+          <p className="text-red-300 text-xs">© {new Date().getFullYear()} CIMB Bank PLC. All rights reserved.</p>
+        </div>
+
+        {/* BG circles */}
+        <div className="absolute top-0 right-0 w-80 h-80 rounded-full opacity-10" style={{background:"radial-gradient(circle, #fff, transparent)", transform:"translate(35%, -35%)"}}></div>
+        <div className="absolute bottom-20 left-0 w-60 h-60 rounded-full opacity-8" style={{background:"radial-gradient(circle, #fff, transparent)", transform:"translate(-25%, 20%)"}}></div>
       </div>
 
-      {/* RIGHT PANEL — Clean white login form */}
+      {/* RIGHT PANEL — Clean white */}
       <div className="flex-1 flex flex-col items-center justify-center px-8 py-12 bg-white">
         {/* Mobile logo */}
-        <div className="lg:hidden mb-8 flex flex-col items-center">
-          <svg width="60" height="60" viewBox="0 0 80 80" fill="none">
-            <polygon points="40,2 78,40 40,78 2,40" fill="#C8102E" fillOpacity="0.95"/>
-            <polygon points="40,13 67,40 40,67 13,40" fill="#8B0000"/>
-            <text x="40" y="36" textAnchor="middle" fill="white" fontSize="13" fontWeight="900" fontFamily="Arial,sans-serif">CIMB</text>
-            <text x="40" y="51" textAnchor="middle" fill="white" fontSize="8" fontWeight="700" fontFamily="Arial,sans-serif">BANK</text>
+        <div className="lg:hidden mb-8 flex flex-col items-center gap-2">
+          <svg width="130" height="46" viewBox="0 0 200 70" fill="none">
+            <rect width="200" height="70" rx="4" fill="#C8102E"/>
+            <text x="100" y="40" textAnchor="middle" fill="white" fontSize="34" fontWeight="900" fontFamily="Arial Black,Impact,sans-serif" letterSpacing="3">CIMB</text>
+            <path d="M 30 52 Q 100 62 170 52" stroke="white" strokeWidth="3" fill="none" strokeLinecap="round"/>
           </svg>
         </div>
 
         <div className="w-full max-w-sm">
-          {/* Header */}
-          <div className="mb-8">
+          {/* Right panel CIMB logo */}
+          <div className="flex items-center gap-3 mb-8">
+            <svg width="100" height="35" viewBox="0 0 200 70" fill="none">
+              <rect width="200" height="70" rx="4" fill="#C8102E"/>
+              <text x="100" y="40" textAnchor="middle" fill="white" fontSize="34" fontWeight="900" fontFamily="Arial Black,Impact,sans-serif" letterSpacing="3">CIMB</text>
+              <path d="M 30 52 Q 100 62 170 52" stroke="white" strokeWidth="3" fill="none" strokeLinecap="round"/>
+            </svg>
+            <div className="border-l-2 border-slate-200 pl-3">
+              <p className="text-xs font-bold text-slate-700">Loan Pipeline</p>
+              <p className="text-xs text-slate-400">Internal System</p>
+            </div>
+          </div>
+
+          <div className="mb-7">
             <h1 className="text-2xl font-bold text-slate-800">Sign In</h1>
             <p className="text-slate-500 text-sm mt-1">Welcome back! Please enter your credentials.</p>
           </div>
@@ -339,23 +461,15 @@ function LoginPage({ onLogin }) {
               <span>{loading ? "Signing in..." : "Sign In"}</span>
             </button>
           </form>
-
           <p className="text-center text-xs text-slate-400 mt-6">Contact your administrator for login credentials.</p>
-
-          {/* CIMB branding bottom */}
-          <div className="mt-10 pt-6 border-t border-slate-100 flex items-center justify-center gap-2">
-            <svg width="20" height="20" viewBox="0 0 80 80" fill="none">
-              <polygon points="40,2 78,40 40,78 2,40" fill="#C8102E"/>
-              <polygon points="40,13 67,40 40,67 13,40" fill="#8B0000"/>
-            </svg>
-            <span className="text-xs text-slate-400 font-medium">CIMB Bank — Loan Pipeline System</span>
+          <div className="mt-8 pt-5 border-t border-slate-100 text-center">
+            <p className="text-xs text-slate-400">© {new Date().getFullYear()} CIMB Bank PLC. All rights reserved.</p>
           </div>
         </div>
       </div>
     </div>
   );
 }
-
 // =============================================
 // MAIN APP
 // =============================================
