@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, DollarSign, Target, Bell,
   Search, X, Plus, CheckCircle, Briefcase,
   Upload, Sparkles, Mail, Copy, Loader2, Star, LogOut, Shield,
-  Eye, EyeOff, UserPlus, Trash2, Edit2, FileDown, Activity,
+  Eye, EyeOff, UserPlus, Trash2, Edit2, FileDown, Clock,
 } from "lucide-react";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
@@ -645,7 +645,7 @@ export default function App() {
         {id:"deals",    icon:<Briefcase size={19}/>,      label:"List Customer Follow Up"},
         ...(isAdmin?[
           {id:"users",   icon:<Shield size={19}/>,  label:"User Created",   badge:"Admin"},
-          {id:"activity",icon:<Activity size={19}/>,label:"Login Activity", badge:"Admin"},
+          {id:"activity",icon:<Clock size={19}/>,label:"Login Activity", badge:"Admin"},
         ]:[]),
       ].map(item=>(
         <button key={item.id} onClick={()=>{setActiveTab(item.id);setIsMobileMenuOpen(false);}}
@@ -904,7 +904,7 @@ export default function App() {
                       }
                       {activityLogs.length===0&&(
                         <tr><td colSpan={9} className="py-16 text-center text-slate-400">
-                          <Activity size={40} className="mx-auto mb-3 opacity-20"/>
+                          <Clock size={40} className="mx-auto mb-3 opacity-20"/>
                           <p className="font-medium">No login activity yet</p>
                           <p className="text-xs mt-1 text-slate-400">Activity will appear here as users log in and out</p>
                         </td></tr>
