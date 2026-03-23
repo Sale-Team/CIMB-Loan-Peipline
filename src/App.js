@@ -1,3 +1,4 @@
+// APP VERSION: LOGIN-ACTIVITY-INCLUDED
 import React, { useState, useMemo } from "react";
 import {
   LayoutDashboard, Users, DollarSign, Target, Bell,
@@ -24,10 +25,10 @@ const MAX_ATTEMPTS = 5;
 const LOCKOUT_MS = 15 * 60 * 1000;
 const SESSION_TIMEOUT_MS = 60 * 60 * 1000;
 const checkLoginAttempts = (u) => {
-  const r = loginAttempts[u];
-  if (!r) return { allowed: true };
-  if (r.lockedUntil && Date.now() < r.lockedUntil)
-    return { allowed: false, message: `Account locked. Try again in ${Math.ceil((r.lockedUntil - Date.now()) / 60000)} min.` };
+  const rec = loginAttempts[u];
+  if (!rec) return { allowed: true };
+  if (rec.lockedUntil && Date.now() < rec.lockedUntil)
+    return { allowed: false, message: `Account locked. Try again in ${Math.ceil((rec.lockedUntil - Date.now()) / 60000)} min.` };
   return { allowed: true };
 };
 const recordFailedAttempt = (u) => {
@@ -53,9 +54,14 @@ const db = getFirestore(fbApp);
 const appId = "sale-performance-3765a";
 
 const exportToExcel = (data, filename, headers) => {
-  const rows = [headers.map(h => `"${h.label}"`).join(",")];
-  data.forEach(row => rows.push(headers.map(h => `"${String(row[h.key] ?? "").replace(/"/g, '''''')}"`).join(",")));
-  const blob = new Blob(["\uFEFF" + rows.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const q = String.fromCharCode(34);
+  const escapeVal = (val) => String(val ?? "").replace(/"/g, q+q);
+  const rows = [headers.map(h => q+h.label+q).join(",")];
+  data.forEach(row => {
+    rows.push(headers.map(h => q+escapeVal(row[h.key])+q).join(","));
+  });
+  const blob = new Blob(["﻿" + rows.join("
+")], { type: "text/csv;charset=utf-8;" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = filename + "_" + new Date().toISOString().split("T")[0] + ".csv";
@@ -82,16 +88,14 @@ const ACTIVITY_HEADERS = [
   {label:"Login Time",key:"loginTimeStr"},{label:"Logout Time",key:"logoutTimeStr"},
   {label:"Duration",key:"duration"},{label:"Status",key:"status"},
 ];
-const LOAN_TYPES = ["Personal Loan","Business Loan","SME Loan","Corporate Loan","Mortgage","Auto Loan"];
-const INCOME_STATUSES = ["Verified","Pending","Unverified"];
-const INCOME_TYPES = ["Salary","Business","Rental","Other"];
-const BRANCHES = ["NRD","BSL","TLK","PDT","NRM","BTK","MTT","BTB","KPC","SRP","271MM","SSM","598M","VSR","CMT"];
+const LOAN_TYPES     = ["Personal Loan","Business Loan","SME Loan","Corporate Loan","Mortgage","Auto Loan"];
+const INCOME_STATUSES= ["Verified","Pending","Unverified"];
+const INCOME_TYPES   = ["Salary","Business","Rental","Other"];
+const BRANCHES       = ["NRD","BSL","TLK","PDT","NRM","BTK","MTT","BTB","KPC","SRP","271MM","SSM","598M","VSR","CMT"];
 const DEFAULT_ADMINS = [
-  {username:"admin",password:"admin123",role:"admin",name:"System Admin",branch:"NRD",createdAt:Date.now(),passwordHashed:false},
-  {username:"Ck-Team",password:"123!!@@",role:"admin",name:"Ck-Team",branch:"NRD",createdAt:Date.now(),passwordHashed:false},
+  {username:"admin",  password:"admin123",role:"admin",name:"System Admin",branch:"NRD",createdAt:Date.now(),passwordHashed:false},
+  {username:"Ck-Team",password:"123!!@@", role:"admin",name:"Ck-Team",     branch:"NRD",createdAt:Date.now(),passwordHashed:false},
 ];
-
-
 // ============================================================
 // LOGIN PAGE
 // ============================================================
@@ -512,7 +516,7 @@ export default function App() {
     reader.onload=(ev)=>{
       const text=ev.target.result;const lines=text.split(/\r?\n/).filter(l=>l.trim());
       if(lines.length<2){setImportErrors(["File is empty."]);return;}
-      const parseRow=(line)=>{const r=[];let cur="";let inQ=false;for(let i=0;i<line.length;i++){if(line[i]==='"')inQ=!inQ;else if(line[i]===","&&!inQ){r.push(cur.trim());cur="";}else cur+=line[i];}r.push(cur.trim());return r;};
+      const parseRow=(line)=>{const r=[];let cur="";let inQ=false;for(let i=0;i<line.length;i++){if(line[i].charCodeAt(0)===34)inQ=!inQ;else if(line[i]===","&&!inQ){r.push(cur.trim());cur="";}else cur+=line[i];}r.push(cur.trim());return r;};
       const hdr=parseRow(lines[0]).map(h=>h.replace(/"/g,"").toLowerCase().trim());
       const errors=[];const preview=[];
       const colMap={client:["customer name","name","client"],businessName:["business","workplace"],phone:["phone","telegram"],branch:["branch"],loanType:["loan type","product"],amount:["request amount ($)","request amount","amount"],approvedAmount:["approved amount ($)","approved amount"],rate:["rate (%)","rate"],tenor:["tenor (months)","tenor"],incomeType:["income type"],incomeAmount:["income amount ($)","income amount"],incomeStatus:["income status"],customerStatus:["customer priority","priority"],status:["loan status","status"],existingBank:["existing bank"],loanOutstanding:["loan outstanding ($)","loan outstanding"],existingRate:["existing rate (%)","existing rate"],maturityDate:["maturity date"],rmUsername:["rm username","rm"]};
@@ -645,7 +649,7 @@ export default function App() {
         {id:"deals",    icon:<Briefcase size={19}/>,      label:"List Customer Follow Up"},
         ...(isAdmin?[
           {id:"users",   icon:<Shield size={19}/>,  label:"User Created",   badge:"Admin"},
-          {id:"activity",icon:<Clock size={19}/>,label:"Login Activity", badge:"Admin"},
+          {id:"activity",icon:<Activity size={19}/>,label:"Login Activity", badge:"Admin"},
         ]:[]),
       ].map(item=>(
         <button key={item.id} onClick={()=>{setActiveTab(item.id);setIsMobileMenuOpen(false);}}
@@ -904,7 +908,7 @@ export default function App() {
                       }
                       {activityLogs.length===0&&(
                         <tr><td colSpan={9} className="py-16 text-center text-slate-400">
-                          <Clock size={40} className="mx-auto mb-3 opacity-20"/>
+                          <Activity size={40} className="mx-auto mb-3 opacity-20"/>
                           <p className="font-medium">No login activity yet</p>
                           <p className="text-xs mt-1 text-slate-400">Activity will appear here as users log in and out</p>
                         </td></tr>
